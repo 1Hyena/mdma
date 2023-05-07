@@ -4,6 +4,10 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <limits>
+#include <md4c-html.h>
+
+void process_output(const MD_CHAR *, MD_SIZE, void *);
 
 int main(int argc, char **argv) {
     OPTIONS options("MarkDown Monolith Assembler", "1.0", "Erich Erstu");
@@ -41,7 +45,20 @@ int main(int argc, char **argv) {
         markdown_text.assign(sstr.str());
     }
 
-    std::cout << markdown_text << "\n";
+    if (markdown_text.size() > std::numeric_limits<MD_SIZE>::max()) {
+        std::cerr << options.file << ": file size limit exceeded\n";
+        return EXIT_FAILURE;
+    }
 
-    return EXIT_SUCCESS;
+    fail = md_html(
+        markdown_text.c_str(), MD_SIZE(markdown_text.size()), process_output,
+        nullptr, MD_DIALECT_GITHUB, 0
+    );
+
+    return fail ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+void process_output(const MD_CHAR *str, MD_SIZE len, void *userdata) {
+    std::string segment(str, len);
+    std::cout << segment;
 }
