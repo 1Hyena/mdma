@@ -25,12 +25,12 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    std::string markdown_text;
+    std::string md_text;
 
     if (options.file.empty()) {
         std::ostringstream std_input;
         std_input << std::cin.rdbuf();
-        markdown_text.assign(std_input.str());
+        md_text.assign(std_input.str());
     }
     else {
         std::ifstream input(options.file);
@@ -42,23 +42,27 @@ int main(int argc, char **argv) {
 
         std::stringstream sstr;
         input >> sstr.rdbuf();
-        markdown_text.assign(sstr.str());
+        md_text.assign(sstr.str());
     }
 
-    if (markdown_text.size() > std::numeric_limits<MD_SIZE>::max()) {
+    if (md_text.size() > std::numeric_limits<MD_SIZE>::max()) {
         std::cerr << options.file << ": file size limit exceeded\n";
         return EXIT_FAILURE;
     }
 
+    std::string html_text;
+
     fail = md_html(
-        markdown_text.c_str(), MD_SIZE(markdown_text.size()), process_output,
-        nullptr, MD_DIALECT_GITHUB, 0
+        md_text.c_str(), MD_SIZE(md_text.size()), process_output,
+        &html_text, MD_DIALECT_GITHUB, 0
     );
+
+    std::cout << html_text << "\n";
 
     return fail ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
 void process_output(const MD_CHAR *str, MD_SIZE len, void *userdata) {
-    std::string segment(str, len);
-    std::cout << segment;
+    std::string *html_text = static_cast<std::string *>(userdata);
+    html_text->append(str, len);
 }
