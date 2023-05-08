@@ -56,15 +56,27 @@ int main(int argc, char **argv) {
 
     fail = md_html(
         md_text.c_str(), MD_SIZE(md_text.size()), process_output,
-        &html_text, MD_DIALECT_GITHUB, 0
+        &html_text, MD_DIALECT_GITHUB, MD_HTML_FLAG_XHTML
     );
 
     {
         TidyBuffer tidy_buffer{};
         TidyDoc tdoc = tidyCreate();
 
+        //tidyOptSetBool(tdoc, TidyXmlTags, yes);
+        //tidyOptSetBool(tdoc, TidyHtmlOut, yes);
+        //tidyOptSetBool(tdoc, TidyXmlTags, no);
+        //tidyOptSetBool(tdoc, TidyXmlOut, no);
         tidyParseString( tdoc, html_text.c_str() );
         html_text.clear();
+
+        //tidyCleanAndRepair( tdoc );
+
+        tidySaveBuffer( tdoc, &tidy_buffer );
+        html_text.assign((const char *) tidy_buffer.bp, tidy_buffer.size);
+
+        tidyRelease( tdoc );
+        tidyBufFree( &tidy_buffer );
 
         /*
         TidyNode parent = tidyGetRoot(tdoc);
@@ -111,6 +123,7 @@ int main(int argc, char **argv) {
         }
         */
 
+        /*
         TidyNode body = tidyGetBody(tdoc);
 
         if (body) {
@@ -153,15 +166,7 @@ int main(int argc, char **argv) {
             }
         }
 
-
-
-        //tidyCleanAndRepair( tdoc );
-        //tidySaveBuffer( tdoc, &tidy_buffer );
-
-        //html_text.assign((const char *) tidy_buffer.bp, tidy_buffer.size);
-
-        tidyRelease( tdoc );
-        tidyBufFree( &tidy_buffer );
+        */
     }
 
     std::cout << html_text << "\n";
