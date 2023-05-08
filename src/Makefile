@@ -3,7 +3,7 @@ NAME    = mdma
 CC      = g++
 PROF    = -O3
 C_FLAGS = -std=c++20 -Wall -Wextra -pedantic-errors -Wconversion -Wno-unused-parameter -fmax-errors=5 $(PROF)
-L_FLAGS = -lm -lstdc++ -lmd4c-html -ltidy $(PROF)
+L_FLAGS = -lm -lstdc++ -lmd4c-html -ltidy -ltinyxml2 $(PROF)
 OBJ_DIR = obj
 DEFINES =
 
