@@ -13,6 +13,7 @@ class OPTIONS {
     static constexpr const char *usage_format{
         "Usage: %s [OPTION]... [FILE]\n"
         "Options:\n"
+        "  -f  --framework     Use a custom HTML framework file.\n"
         "      --brief         Print brief messages (default).\n"
         "      --debug         Print debugging messages.\n"
         "  -h  --help          Display this usage information.\n"
@@ -35,6 +36,7 @@ class OPTIONS {
             }
         )
         , file         (        "" )
+        , framework    (        "" )
         , caption      (   caption )
         , version      (   version )
         , copyright    ( copyright )
@@ -45,6 +47,7 @@ class OPTIONS {
 
     flagset_type flags;
     std::string  file;
+    std::string  framework;
 
     std::string caption;
     std::string version;
@@ -56,13 +59,14 @@ class OPTIONS {
     ) {
         static struct option long_options[] = {
             // These options set a flag:
-            {"debug",       no_argument,       &flags.debug,   1 },
-            {"brief",       no_argument,       &flags.verbose, 0 },
-            {"verbose",     no_argument,       &flags.verbose, 1 },
+            { "debug",       no_argument,       &flags.debug,   1 },
+            { "brief",       no_argument,       &flags.verbose, 0 },
+            { "verbose",     no_argument,       &flags.verbose, 1 },
             // These options don't set a flag. We distinguish them by indices:
-            {"help",        no_argument,       0,             'h'},
-            {"version",     no_argument,       0,             'v'},
-            {0,             0,                 0,              0 }
+            { "framework",   required_argument, 0,             'f'},
+            { "help",        no_argument,       0,             'h'},
+            { "version",     no_argument,       0,             'v'},
+            { 0,             0,                 0,              0 }
         };
 
         this->log_callback = log_callback;
@@ -95,6 +99,10 @@ class OPTIONS {
                         log("%s", buf.c_str());
                         break;
                     }
+                case 'f': {
+                    framework.assign(optarg);
+                    break;
+                }
                 case 'h': {
                     fprintf(stdout, usage_format, argv[0]);
                     flags.exit = 1;

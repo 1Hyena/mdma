@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "options.h"
+////////////////////////////////////////////////////////////////////////////////
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
@@ -13,55 +14,14 @@
 #include <signal.h>
 
 void process_output(const MD_CHAR *, MD_SIZE, void *);
-
 const tinyxml2::XMLElement *find_if(
     const tinyxml2::XMLElement &root,
     std::function<bool(const tinyxml2::XMLElement &, int)> fun
-) {
-    int depth = 0;
-
-    const tinyxml2::XMLElement *parent = &root;
-
-    while (parent) {
-        if (fun(*parent, depth)) {
-            return parent;
-        }
-
-        const tinyxml2::XMLElement *child = parent->FirstChildElement();
-
-        if (child) {
-            parent = child;
-            ++depth;
-            continue;
-        }
-
-        const tinyxml2::XMLElement *sibling = parent->NextSiblingElement();
-
-        if (sibling) {
-            parent = sibling;
-            continue;
-        }
-
-        do {
-            const tinyxml2::XMLNode *parent_node = parent->Parent();
-
-            parent = parent_node ? parent_node->ToElement() : nullptr;
-
-            if (!parent) break;
-
-            sibling = parent->NextSiblingElement();
-
-            --depth;
-        }
-        while (!sibling);
-
-        parent = sibling;
-    }
-
-    return nullptr;
-}
+);
 
 int main(int argc, char **argv) {
+    auto default_framework{std::to_array<unsigned char>({ MDMA_FRAMEWORK })};
+
     OPTIONS options("MarkDown Monolith Assembler", "1.0", "Erich Erstu");
 
     bool fail = !options.deserialize(
@@ -78,6 +38,7 @@ int main(int argc, char **argv) {
     }
 
     std::string md_text;
+    std::string framework_text;
 
     if (options.file.empty()) {
         std::ostringstream std_input;
@@ -100,6 +61,24 @@ int main(int argc, char **argv) {
     if (md_text.size() > std::numeric_limits<MD_SIZE>::max()) {
         std::cerr << options.file << ": file size limit exceeded\n";
         return EXIT_FAILURE;
+    }
+
+    if (options.framework.empty()) {
+        framework_text.assign(
+            (const char *) default_framework.data(), default_framework.size()
+        );
+    }
+    else {
+        std::ifstream input(options.framework, std::ios::binary);
+
+        if (!input) {
+            std::cerr << options.framework << ": " << strerror(errno) << "\n";
+            return EXIT_FAILURE;
+        }
+
+        std::stringstream sstr;
+        input >> sstr.rdbuf();
+        framework_text.assign(sstr.str());
     }
 
     std::string xhtml_text;
@@ -232,4 +211,51 @@ int main(int argc, char **argv) {
 void process_output(const MD_CHAR *str, MD_SIZE len, void *userdata) {
     std::string *dest = static_cast<std::string *>(userdata);
     dest->append(str, len);
+}
+
+const tinyxml2::XMLElement *find_if(
+    const tinyxml2::XMLElement &root,
+    std::function<bool(const tinyxml2::XMLElement &, int)> fun
+) {
+    int depth = 0;
+
+    const tinyxml2::XMLElement *parent = &root;
+
+    while (parent) {
+        if (fun(*parent, depth)) {
+            return parent;
+        }
+
+        const tinyxml2::XMLElement *child = parent->FirstChildElement();
+
+        if (child) {
+            parent = child;
+            ++depth;
+            continue;
+        }
+
+        const tinyxml2::XMLElement *sibling = parent->NextSiblingElement();
+
+        if (sibling) {
+            parent = sibling;
+            continue;
+        }
+
+        do {
+            const tinyxml2::XMLNode *parent_node = parent->Parent();
+
+            parent = parent_node ? parent_node->ToElement() : nullptr;
+
+            if (!parent) break;
+
+            sibling = parent->NextSiblingElement();
+
+            --depth;
+        }
+        while (!sibling);
+
+        parent = sibling;
+    }
+
+    return nullptr;
 }
