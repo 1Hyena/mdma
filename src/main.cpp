@@ -13,15 +13,10 @@
 #include <list>
 #include <signal.h>
 
-void process_output(const MD_CHAR *, MD_SIZE, void *);
-const tinyxml2::XMLElement *find_if(
-    const tinyxml2::XMLElement &root,
-    std::function<bool(const tinyxml2::XMLElement &, int)> fun
-);
+bool parse_framework(const std::string &path);
+bool parse_markdown(const std::string &path, std::list<tinyxml2::XMLDocument> &);
 
 int main(int argc, char **argv) {
-    auto default_framework{std::to_array<unsigned char>({ MDMA_FRAMEWORK })};
-
     OPTIONS options("MarkDown Monolith Assembler", "1.0", "Erich Erstu");
 
     bool fail = !options.deserialize(
@@ -37,180 +32,208 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    std::string md_text;
-    std::string framework_text;
-
-    if (options.file.empty()) {
-        std::ostringstream std_input;
-        std_input << std::cin.rdbuf();
-        md_text.assign(std_input.str());
-    }
-    else {
-        std::ifstream input(options.file, std::ios::binary);
-
-        if (!input) {
-            std::cerr << options.file << ": " << strerror(errno) << "\n";
-            return EXIT_FAILURE;
-        }
-
-        std::stringstream sstr;
-        input >> sstr.rdbuf();
-        md_text.assign(sstr.str());
-    }
-
-    if (md_text.size() > std::numeric_limits<MD_SIZE>::max()) {
-        std::cerr << options.file << ": file size limit exceeded\n";
+    if (!parse_framework(options.framework)) {
         return EXIT_FAILURE;
     }
 
-    if (options.framework.empty()) {
-        framework_text.assign(
-            (const char *) default_framework.data(), default_framework.size()
-        );
-    }
-    else {
-        std::ifstream input(options.framework, std::ios::binary);
+    std::list<tinyxml2::XMLDocument> sections;
 
-        if (!input) {
-            std::cerr << options.framework << ": " << strerror(errno) << "\n";
-            return EXIT_FAILURE;
-        }
-
-        std::stringstream sstr;
-        input >> sstr.rdbuf();
-        framework_text.assign(sstr.str());
+    if (!parse_markdown(options.file, sections)) {
+        return EXIT_FAILURE;
     }
 
-    std::string xhtml_text;
+    tinyxml2::XMLPrinter printer;
 
-    fail = md_html(
-        md_text.c_str(), MD_SIZE(md_text.size()), process_output,
-        &xhtml_text, MD_DIALECT_GITHUB, MD_HTML_FLAG_XHTML
-    );
-
-    {
-        tinyxml2::XMLDocument doc;
-
-        doc.Parse(xhtml_text.c_str(), xhtml_text.size());
-
-        tinyxml2::XMLElement *parent = doc.RootElement();
-        const tinyxml2::XMLElement *first_heading = nullptr;
-
-        std::list<tinyxml2::XMLDocument> chapters;
-
-        tinyxml2::XMLPrinter printer;
-
-        if (parent) {
-            first_heading = find_if(
-                *parent,
-                [](const tinyxml2::XMLElement &el, int depth) {
-                    const char *name = el.Name();
-
-                    if (name) {
-                        if (!strcasecmp("h1", name)) {
-                            return true;
-                        }
-                    }
-
-                    return false;
-                }
-            );
-
-            const tinyxml2::XMLElement *sibling = first_heading;
-            int next_id=1;
-
-            for (; first_heading; sibling = sibling->NextSiblingElement()) {
-                const char *name = sibling ? sibling->Name() : nullptr;
-
-                tinyxml2::XMLElement *root = nullptr;
-
-                if ((name && !strcasecmp("h1", name)) || !sibling) {
-                    if (!chapters.empty()) {
-                        chapters.back().Print(&printer);
-                    }
-
-                    if (!sibling) {
-                        break;
-                    }
-
-                    chapters.emplace_back();
-
-                    tinyxml2::XMLNode *node{
-                        chapters.back().InsertFirstChild(
-                            chapters.back().NewElement("div")
-                        )
-                    };
-
-                    tinyxml2::XMLElement *elem{
-                        node ? node->ToElement() : nullptr
-                    };
-
-                    if (elem) {
-                        elem->SetAttribute("class", "tab");
-
-                        node = elem->InsertFirstChild(
-                            chapters.back().NewElement("a")
-                        );
-
-                        elem = node ? node->ToElement() : nullptr;
-
-                        if (elem) {
-                            std::string id{"chapter-"};
-                            id.append(std::to_string(next_id++));
-
-                            elem->SetAttribute("id", id.c_str());
-                            elem->SetAttribute(
-                                "href", std::string("#").append(id).c_str()
-                            );
-
-                            root = elem;
-                        }
-                        else raise(SIGSEGV);
-                    }
-                    else raise(SIGSEGV);
-                }
-                else {
-                    root = chapters.back().RootElement();
-                }
-
-                if (chapters.empty()) continue;
-
-                tinyxml2::XMLNode *node = sibling->DeepClone(&chapters.back());
-
-                if (node) {
-                    root->InsertEndChild(node);
-                }
-            }
-        }
-
-        xhtml_text.assign(printer.CStr());
+    for (const tinyxml2::XMLDocument &doc : sections) {
+        doc.Print(&printer);
     }
+
+    std::string output(printer.CStr());
 
     {
         TidyBuffer tidy_buffer{};
         TidyDoc tdoc = tidyCreate();
 
         tidyOptSetBool(tdoc, TidyIndentContent, yes);
-        tidyParseString( tdoc, xhtml_text.c_str() );
-        xhtml_text.clear();
+        tidyParseString( tdoc, output.c_str() );
+        output.clear();
 
         tidyCleanAndRepair( tdoc );
 
         tidySaveBuffer( tdoc, &tidy_buffer );
-        xhtml_text.assign((const char *) tidy_buffer.bp, tidy_buffer.size);
+        output.assign((const char *) tidy_buffer.bp, tidy_buffer.size);
 
         tidyRelease( tdoc );
         tidyBufFree( &tidy_buffer );
     }
 
-    std::cout << xhtml_text << "\n";
+    std::cout << output << "\n";
 
     return fail ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
-void process_output(const MD_CHAR *str, MD_SIZE len, void *userdata) {
-    std::string *dest = static_cast<std::string *>(userdata);
-    dest->append(str, len);
+const tinyxml2::XMLElement *find_if(
+    const tinyxml2::XMLElement &root,
+    std::function<bool(const tinyxml2::XMLElement &, int)> fun
+);
+
+bool parse_framework(const std::string &path) {
+    auto default_framework{std::to_array<unsigned char>({ MDMA_FRAMEWORK })};
+    std::string framework;
+
+    if (path.empty()) {
+        framework.assign(
+            (const char *) default_framework.data(), default_framework.size()
+        );
+    }
+    else {
+        std::ifstream input(path, std::ios::binary);
+
+        if (!input) {
+            std::cerr << path << ": " << strerror(errno) << "\n";
+            return false;
+        }
+
+        std::stringstream sstr;
+        input >> sstr.rdbuf();
+        framework.assign(sstr.str());
+    }
+
+    return true;
+}
+
+bool parse_markdown(
+    const std::string &path, std::list<tinyxml2::XMLDocument> &sections
+) {
+    std::string markdown;
+
+    if (path.empty()) {
+        std::ostringstream std_input;
+        std_input << std::cin.rdbuf();
+        markdown.assign(std_input.str());
+    }
+    else {
+        std::ifstream input(path, std::ios::binary);
+
+        if (!input) {
+            std::cerr << path << ": " << strerror(errno) << "\n";
+            return false;
+        }
+
+        std::stringstream sstr;
+        input >> sstr.rdbuf();
+        markdown.assign(sstr.str());
+    }
+
+    if (markdown.size() > std::numeric_limits<MD_SIZE>::max()) {
+        std::cerr << path << ": file size limit exceeded\n";
+        return false;
+    }
+
+    std::string xhtml;
+
+    bool fail = md_html(
+        markdown.c_str(), MD_SIZE(markdown.size()),
+        [](const MD_CHAR *str, MD_SIZE len, void *userdata) {
+            std::string *dest = static_cast<std::string *>(userdata);
+            dest->append(str, len);
+        },
+        &xhtml, MD_DIALECT_GITHUB, MD_HTML_FLAG_XHTML
+    );
+
+    if (fail) {
+        std::cerr << path << ": unable to convert into HTML\n";
+        return false;
+    }
+
+    tinyxml2::XMLDocument doc;
+    doc.Parse(xhtml.c_str(), xhtml.size());
+    tinyxml2::XMLElement *parent = doc.RootElement();
+
+    if (!parent) {
+        std::cerr << path << ": unacceptable content\n";
+        return false;
+    }
+
+    const tinyxml2::XMLElement *first_heading = find_if(
+        *parent,
+        [](const tinyxml2::XMLElement &el, int depth) {
+            const char *name = el.Name();
+
+            if (name) {
+                if (!strcasecmp("h1", name)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    );
+
+    const tinyxml2::XMLElement *sibling = first_heading;
+    int next_id=1;
+
+    for (; first_heading; sibling = sibling->NextSiblingElement()) {
+        const char *name = sibling ? sibling->Name() : nullptr;
+
+        tinyxml2::XMLElement *root = nullptr;
+
+        if ((name && !strcasecmp("h1", name)) || !sibling) {
+            if (!sibling) {
+                break;
+            }
+
+            sections.emplace_back();
+
+            tinyxml2::XMLNode *node{
+                sections.back().InsertFirstChild(
+                    sections.back().NewElement("div")
+                )
+            };
+
+            tinyxml2::XMLElement *elem{
+                node ? node->ToElement() : nullptr
+            };
+
+            if (elem) {
+                elem->SetAttribute("class", "tab");
+
+                node = elem->InsertFirstChild(
+                    sections.back().NewElement("a")
+                );
+
+                elem = node ? node->ToElement() : nullptr;
+
+                if (elem) {
+                    std::string id{"chapter-"};
+                    id.append(std::to_string(next_id++));
+
+                    elem->SetAttribute("id", id.c_str());
+                    elem->SetAttribute(
+                        "href", std::string("#").append(id).c_str()
+                    );
+
+                    root = elem;
+                }
+                else raise(SIGSEGV);
+            }
+            else raise(SIGSEGV);
+        }
+        else {
+            root = sections.back().RootElement();
+        }
+
+        if (sections.empty()) continue;
+
+        tinyxml2::XMLNode *node = sibling->DeepClone(&sections.back());
+
+        if (node) {
+            root->InsertEndChild(node);
+        }
+    }
+
+
+    return true;
 }
 
 const tinyxml2::XMLElement *find_if(
