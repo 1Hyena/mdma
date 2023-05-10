@@ -15,8 +15,10 @@
 #include <signal.h>
 
 bool parse_framework(
-    const std::string &path, const std::list<tinyxml2::XMLDocument> &sections
+    const std::string &path, const std::list<tinyxml2::XMLDocument> &sections,
+    const std::map<std::string, std::string> &headings
 );
+
 bool parse_markdown(
     const std::string &path, std::list<tinyxml2::XMLDocument> &sections,
     std::function<std::string(const tinyxml2::XMLElement &heading)> callback
@@ -64,39 +66,8 @@ int main(int argc, char **argv) {
 
     if (fail) return EXIT_FAILURE;
 
-    if (!parse_framework(options.framework, sections)) {
+    if (!parse_framework(options.framework, sections, headings)) {
         return EXIT_FAILURE;
-    }
-/*
-    tinyxml2::XMLPrinter printer;
-
-    for (const tinyxml2::XMLDocument &doc : sections) {
-        doc.Print(&printer);
-    }
-
-    std::string output(printer.CStr());
-
-    {
-        TidyBuffer tidy_buffer{};
-        TidyDoc tdoc = tidyCreate();
-
-        tidyOptSetBool(tdoc, TidyIndentContent, yes);
-        tidyParseString( tdoc, output.c_str() );
-        output.clear();
-
-        tidyCleanAndRepair( tdoc );
-
-        tidySaveBuffer( tdoc, &tidy_buffer );
-        output.assign((const char *) tidy_buffer.bp, tidy_buffer.size);
-
-        tidyRelease( tdoc );
-        tidyBufFree( &tidy_buffer );
-    }
-
-    std::cout << output << "\n";
-*/
-    for (const auto &p : headings) {
-        std::cout << p.first << ": " << p.second << "\n";
     }
 
     return fail ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -252,8 +223,150 @@ bool parse_markdown(
     return true;
 }
 
+void assemble_framework_body(
+    std::string &body_html, const std::list<tinyxml2::XMLDocument> &sections,
+    const std::map<std::string, std::string> &headings
+) {
+    tinyxml2::XMLDocument doc;
+
+    {
+        TidyBuffer tidy_buffer{};
+        TidyDoc tdoc_xml = tidyCreate();
+
+        tidyOptSetBool(tdoc_xml, TidyHideComments, yes);
+        tidyOptSetBool(tdoc_xml, TidyMergeSpans, no);
+        tidyOptSetBool(tdoc_xml, TidyDropEmptyElems, no);
+        tidyOptSetBool(tdoc_xml, TidyDropEmptyParas, no);
+        tidyOptSetBool(tdoc_xml, TidyXmlOut, yes);
+        tidyParseString(tdoc_xml, body_html.c_str());
+
+        TidyNode body_node = tidyGetBody(tdoc_xml);
+
+        tidyNodeGetText(tdoc_xml, body_node, &tidy_buffer);
+
+        doc.Parse((const char *) tidy_buffer.bp, tidy_buffer.size);
+
+        tidyRelease(tdoc_xml);
+        tidyBufFree(&tidy_buffer);
+    }
+
+    tinyxml2::XMLElement *parent = doc.RootElement();
+
+    tinyxml2::XMLElement *content = find_if(
+        *parent,
+        [](const tinyxml2::XMLElement &el, int) {
+            const char *name = el.Name();
+
+            if (name && strcasecmp("div", name)) {
+                return false;
+            }
+
+            const char *id = "";
+
+            if (el.QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
+                return false;
+            }
+
+            if (id && !strcasecmp("MDMA-CONTENT", id)) {
+                return true;
+            }
+
+            return false;
+        }
+    );
+
+    if (content) {
+        content->DeleteChildren();
+
+        for (const tinyxml2::XMLDocument &section : sections) {
+            const tinyxml2::XMLElement *root = section.RootElement();
+            tinyxml2::XMLNode *node = root->DeepClone(&doc);
+
+            if (node) {
+                content->InsertEndChild(node);
+            }
+        }
+    }
+
+    tinyxml2::XMLElement *agenda = find_if(
+        *parent,
+        [](const tinyxml2::XMLElement &el, int) {
+            const char *name = el.Name();
+
+            if (name && strcasecmp("div", name)) {
+                return false;
+            }
+
+            const char *id = "";
+
+            if (el.QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
+                return false;
+            }
+
+            if (id && !strcasecmp("MDMA-AGENDA", id)) {
+                return true;
+            }
+
+            return false;
+        }
+    );
+
+    if (agenda) {
+        agenda->DeleteChildren();
+
+        for (const auto &p : headings) {
+            tinyxml2::XMLNode *node = agenda->InsertEndChild(
+                doc.NewElement("a")
+            );
+
+            tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
+
+            if (elem) {
+                elem->SetAttribute(
+                    "href", std::string("#").append(p.first).c_str()
+                );
+
+                elem->InsertNewText(p.second.c_str());
+            }
+            else raise(SIGSEGV);
+        }
+    }
+
+    tinyxml2::XMLPrinter printer;
+    doc.Print(&printer);
+
+    body_html.assign(printer.CStr());
+
+    {
+        // Let's convert XML to HTML.
+
+        TidyBuffer tidy_buffer{};
+        TidyDoc tdoc = tidyCreate();
+
+        tidyOptSetBool(tdoc, TidyHideComments, yes);
+        tidyOptSetBool(tdoc, TidyMergeSpans, no);
+        tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
+        tidyOptSetBool(tdoc, TidyDropEmptyParas, no);
+
+        tidyParseString( tdoc, body_html.c_str() );
+
+        TidyNode body = tidyGetBody(tdoc);
+
+        tidyNodeGetText(tdoc, body, &tidy_buffer);
+        body_html.assign(
+            (const char *) tidy_buffer.bp, tidy_buffer.size
+        );
+
+        tidyRelease(tdoc);
+        tidyBufFree(&tidy_buffer);
+    }
+}
+
+TidyNode find_if(TidyNode root, std::function<bool(const TidyNode &, int)> fun);
+
 bool parse_framework(
-    const std::string &path, const std::list<tinyxml2::XMLDocument> &sections
+    const std::string &path, const std::list<tinyxml2::XMLDocument> &sections,
+    const std::map<std::string, std::string> &headings
 ) {
     auto default_framework{std::to_array<unsigned char>({ MDMA_FRAMEWORK })};
     std::string framework;
@@ -276,113 +389,163 @@ bool parse_framework(
         framework.assign(sstr.str());
     }
 
-    {
-        TidyBuffer tidy_buffer{};
-        TidyDoc tdoc = tidyCreate();
+    TidyBuffer tidy_buffer{};
+    TidyDoc tdoc = tidyCreate();
 
-        tidyOptSetBool(tdoc, TidyXmlOut, yes);
-        tidyOptSetBool(tdoc, TidyHideComments, yes);
-        tidyOptSetBool(tdoc, TidyMergeSpans, no);
-        tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
-        tidyOptSetBool(tdoc, TidyDropEmptyParas, no);
+    tidyOptSetBool(tdoc, TidyHideComments, yes);
+    tidyOptSetBool(tdoc, TidyMergeSpans, no);
+    tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
+    tidyOptSetBool(tdoc, TidyDropEmptyParas, no);
+    tidyOptSetBool(tdoc, TidyIndentContent, yes);
+    tidyParseString( tdoc, framework.c_str() );
+    framework.clear();
 
-        tidyParseString( tdoc, framework.c_str() );
-        framework.clear();
+    do {
+        TidyNode style = find_if(
+            tidyGetHead(tdoc),
+            [](const TidyNode &node, int) {
+                TidyAttr attr = tidyAttrGetById(node, TidyAttr_CLASS);
 
-        //tidyCleanAndRepair( tdoc );
+                if (attr
+                && !strcasecmp(tidyAttrValue(attr), "MDMA-REJECT")) {
+                    return true;
+                }
 
-        TidyNode root = tidyGetRoot(tdoc);
+                return false;
+            }
+        );
 
-        while (true) {
-            bool repeat = false;
+        if (!style) break;
 
-            for (TidyNode child = tidyGetChild(root); child; child = tidyGetNext(child) ) {
-                auto node_type = tidyNodeGetType(child);
+        tidyDiscardElement(tdoc, style);
+    }
+    while (true);
 
-                if (node_type != TidyNode_Start && node_type != TidyNode_End) {
-                    std::cout << "OTHER\n";
-                    tidyDiscardElement(tdoc, child);
-                    repeat = true;
+    std::string agenda_css;
+    size_t heading_counter = 0;
+
+    for (const auto &p : headings) {
+        const std::string &anchor_id = p.first;
+        ++heading_counter;
+
+        agenda_css.append("#MDMA-CONTENT:has(#").append(anchor_id).append(
+            ":target) ~ .menu a[href=\"#"
+        ).append(anchor_id).append("\"]");
+
+        if (heading_counter == headings.size()) {
+            agenda_css.append(" {\n").append("    color: green;\n}\n");
+        }
+        else {
+            agenda_css.append(",\n");
+        }
+    }
+
+    std::map<int, std::string, std::greater<int>> end_tags;
+
+    find_if(
+        tidyGetRoot(tdoc),
+        [&](const TidyNode &node, int depth) {
+            while (!end_tags.empty()) {
+                int d = end_tags.begin()->first;
+
+                if (depth <= d) {
+                    framework.append(end_tags.begin()->second);
+                    end_tags.erase(d);
+                }
+                else break;
+            }
+
+            switch (depth) {
+                case 1: {
+                    if (tidyNodeGetId(node) != TidyTag_HTML) {
+                        tidyNodeGetText(tdoc, node, &tidy_buffer);
+                        framework.append(
+                            (const char *) tidy_buffer.bp, tidy_buffer.size
+                        );
+                        tidyBufClear(&tidy_buffer);
+                    }
+                    else {
+                        framework.append("<html>\n");
+                        end_tags[depth].append("</html>\n");
+                    }
+
                     break;
                 }
+                case 2: {
+                    TidyNode parent = tidyGetParent(node);
 
-                const char *name = tidyNodeGetName( child );
-                if (name) {
-                    std::cout << name << "\n";
-
-                    if (!strcasecmp("html", name)) {
-                        if (tidyNodeGetText(tdoc, child, &tidy_buffer)) {
-                            framework.assign((const char *) tidy_buffer.bp, tidy_buffer.size);
-                            break;
-                        }
+                    if (tidyNodeGetId(parent) != TidyTag_HTML) {
+                        break;
                     }
+
+                    if (tidyNodeGetId(node) == TidyTag_HEAD) {
+                        framework.append("<head>\n");
+
+                        if (!headings.empty()) {
+                            end_tags[depth].append("<style>\n").append(
+                                agenda_css
+                            ).append("</style>\n");
+                        }
+
+                        end_tags[depth].append("</head>\n");
+                    }
+                    else if (tidyNodeGetId(node) == TidyTag_BODY) {
+                        tidyNodeGetText(tdoc, node, &tidy_buffer);
+                        std::string body_html(
+                            (const char *) tidy_buffer.bp, tidy_buffer.size
+                        );
+                        tidyBufClear(&tidy_buffer);
+
+                        assemble_framework_body(body_html, sections, headings);
+
+                        framework.append(body_html);
+                    }
+                    else {
+                        tidyNodeGetText(tdoc, node, &tidy_buffer);
+                        framework.append(
+                            (const char *) tidy_buffer.bp, tidy_buffer.size
+                        );
+                        tidyBufClear(&tidy_buffer);
+                    }
+
+                    break;
                 }
-                else std::cout << "other\n";
-            }
+                case 3: {
+                    TidyNode parent = tidyGetParent(node);
 
-            if (!repeat) break;
-        }
+                    if (tidyNodeGetId(parent) != TidyTag_HEAD) {
+                        break;
+                    }
 
-        //tidySaveBuffer( tdoc, &tidy_buffer );
+                    tidyNodeGetText(tdoc, node, &tidy_buffer);
+                    framework.append(
+                        (const char *) tidy_buffer.bp, tidy_buffer.size
+                    );
+                    tidyBufClear(&tidy_buffer);
 
-
-        tidyRelease( tdoc );
-        tidyBufFree( &tidy_buffer );
-    }
-
-    //std::cout << framework << "\n";
-
-
-    tinyxml2::XMLDocument doc;
-    doc.Parse(framework.c_str(), framework.size());
-    tinyxml2::XMLElement *parent = doc.RootElement();
-
-    if (!parent) {
-        std::cerr << path << ": unacceptable content\n";
-        return false;
-    }
-
-    tinyxml2::XMLElement *content = find_if(
-        *parent,
-        [](const tinyxml2::XMLElement &el, int) {
-            const char *name = el.Name();
-
-            if (name && strcasecmp("div", name)) {
-                return false;
-            }
-
-            const char *id = "";
-
-            if (el.QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
-                return false;
-            }
-
-            if (id && !strcasecmp("content", id)) {
-                return true;
+                    break;
+                }
+                default: break;
             }
 
             return false;
         }
     );
 
-    if (content) {
-        content->DeleteChildren();
-
-        for (const tinyxml2::XMLDocument &section : sections) {
-            const tinyxml2::XMLElement *root = section.RootElement();
-            tinyxml2::XMLNode *node = root->DeepClone(&doc);
-
-            if (node) {
-                content->InsertEndChild(node);
-            }
-        }
+    for (const auto &p : end_tags) {
+        framework.append(p.second);
     }
 
-    tinyxml2::XMLPrinter printer;
-    doc.Print(&printer);
-    std::string output(printer.CStr());
+    tidyParseString(tdoc, framework.c_str());
+    tidyCleanAndRepair(tdoc);
+    tidySaveBuffer(tdoc, &tidy_buffer);
 
-    std::cout << output << "\n";
+    framework.assign((const char *) tidy_buffer.bp, tidy_buffer.size);
+
+    tidyRelease(tdoc);
+    tidyBufFree(&tidy_buffer);
+
+    std::cout << framework << "\n";
 
     return true;
 }
@@ -432,4 +595,48 @@ tinyxml2::XMLElement *find_if(
     }
 
     return nullptr;
+}
+
+TidyNode find_if(
+    const TidyNode root, std::function<bool(const TidyNode &, int)> fun
+) {
+    int depth = 0;
+
+    TidyNode parent = root;
+
+    while (parent) {
+        if (fun(parent, depth)) {
+            return const_cast<TidyNode>(parent);;
+        }
+
+        const TidyNode child = tidyGetChild(parent);
+
+        if (child) {
+            parent = child;
+            ++depth;
+            continue;
+        }
+
+        TidyNode sibling = tidyGetNext(parent);
+
+        if (sibling) {
+            parent = sibling;
+            continue;
+        }
+
+        do {
+            parent = tidyGetParent(parent);
+
+            if (!parent) break;
+
+            sibling = tidyGetNext(parent);
+
+            --depth;
+        }
+        while (!sibling);
+
+        parent = sibling;
+    }
+
+    return {};
 }
