@@ -11,20 +11,28 @@
 #include <tidybuffio.h>
 #include <tinyxml2.h>
 #include <list>
+#include <map>
 #include <signal.h>
 
-bool parse_framework(const std::string &path);
-bool parse_markdown(const std::string &path, std::list<tinyxml2::XMLDocument> &);
+bool parse_framework(
+    const std::string &path, const std::list<tinyxml2::XMLDocument> &sections
+);
+bool parse_markdown(
+    const std::string &path, std::list<tinyxml2::XMLDocument> &sections,
+    std::function<std::string(const tinyxml2::XMLElement &heading)> callback
+);
 
 int main(int argc, char **argv) {
     OPTIONS options("MarkDown Monolith Assembler", "1.0", "Erich Erstu");
 
-    bool fail = !options.deserialize(
-        argc, argv,
-        [&](const char *txt){
-            std::cerr << txt << "\n";
-        }
-    );
+    bool fail{
+        !options.deserialize(
+            argc, argv,
+            [&](const char *txt){
+                std::cerr << txt << "\n";
+            }
+        )
+    };
 
     if (fail) return EXIT_FAILURE;
 
@@ -32,16 +40,34 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    if (!parse_framework(options.framework)) {
-        return EXIT_FAILURE;
-    }
-
+    int next_id = 1;
     std::list<tinyxml2::XMLDocument> sections;
+    std::map<std::string, std::string> headings;
 
-    if (!parse_markdown(options.file, sections)) {
+    fail = (
+        !parse_markdown(
+            options.file, sections,
+            [&next_id, &headings](const tinyxml2::XMLElement &heading) {
+                std::string id{"anchor-"};
+                id.append(std::to_string(next_id++));
+
+                const char *title = heading.GetText();
+
+                if (title) {
+                    headings.emplace(id, std::string(title));
+                }
+
+                return id;
+            }
+        )
+    );
+
+    if (fail) return EXIT_FAILURE;
+
+    if (!parse_framework(options.framework, sections)) {
         return EXIT_FAILURE;
     }
-
+/*
     tinyxml2::XMLPrinter printer;
 
     for (const tinyxml2::XMLDocument &doc : sections) {
@@ -68,42 +94,22 @@ int main(int argc, char **argv) {
     }
 
     std::cout << output << "\n";
+*/
+    for (const auto &p : headings) {
+        std::cout << p.first << ": " << p.second << "\n";
+    }
 
     return fail ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
-const tinyxml2::XMLElement *find_if(
+tinyxml2::XMLElement *find_if(
     const tinyxml2::XMLElement &root,
     std::function<bool(const tinyxml2::XMLElement &, int)> fun
 );
 
-bool parse_framework(const std::string &path) {
-    auto default_framework{std::to_array<unsigned char>({ MDMA_FRAMEWORK })};
-    std::string framework;
-
-    if (path.empty()) {
-        framework.assign(
-            (const char *) default_framework.data(), default_framework.size()
-        );
-    }
-    else {
-        std::ifstream input(path, std::ios::binary);
-
-        if (!input) {
-            std::cerr << path << ": " << strerror(errno) << "\n";
-            return false;
-        }
-
-        std::stringstream sstr;
-        input >> sstr.rdbuf();
-        framework.assign(sstr.str());
-    }
-
-    return true;
-}
-
 bool parse_markdown(
-    const std::string &path, std::list<tinyxml2::XMLDocument> &sections
+    const std::string &path, std::list<tinyxml2::XMLDocument> &sections,
+    std::function<std::string(const tinyxml2::XMLElement &heading)> callback
 ) {
     std::string markdown;
 
@@ -171,7 +177,6 @@ bool parse_markdown(
     );
 
     const tinyxml2::XMLElement *sibling = first_heading;
-    int next_id=1;
 
     for (; sibling; sibling = sibling->NextSiblingElement()) {
         tinyxml2::XMLElement *root = nullptr;
@@ -217,8 +222,7 @@ bool parse_markdown(
                 elem = node ? node->ToElement() : nullptr;
 
                 if (elem) {
-                    std::string id{"anchor-"};
-                    id.append(std::to_string(next_id++));
+                    std::string id(callback(*sibling));
 
                     elem->SetAttribute("id", id.c_str());
                     elem->SetAttribute(
@@ -248,7 +252,142 @@ bool parse_markdown(
     return true;
 }
 
-const tinyxml2::XMLElement *find_if(
+bool parse_framework(
+    const std::string &path, const std::list<tinyxml2::XMLDocument> &sections
+) {
+    auto default_framework{std::to_array<unsigned char>({ MDMA_FRAMEWORK })};
+    std::string framework;
+
+    if (path.empty()) {
+        framework.assign(
+            (const char *) default_framework.data(), default_framework.size()
+        );
+    }
+    else {
+        std::ifstream input(path, std::ios::binary);
+
+        if (!input) {
+            std::cerr << path << ": " << strerror(errno) << "\n";
+            return false;
+        }
+
+        std::stringstream sstr;
+        input >> sstr.rdbuf();
+        framework.assign(sstr.str());
+    }
+
+    {
+        TidyBuffer tidy_buffer{};
+        TidyDoc tdoc = tidyCreate();
+
+        tidyOptSetBool(tdoc, TidyXmlOut, yes);
+        tidyOptSetBool(tdoc, TidyHideComments, yes);
+        tidyOptSetBool(tdoc, TidyMergeSpans, no);
+        tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
+        tidyOptSetBool(tdoc, TidyDropEmptyParas, no);
+
+        tidyParseString( tdoc, framework.c_str() );
+        framework.clear();
+
+        //tidyCleanAndRepair( tdoc );
+
+        TidyNode root = tidyGetRoot(tdoc);
+
+        while (true) {
+            bool repeat = false;
+
+            for (TidyNode child = tidyGetChild(root); child; child = tidyGetNext(child) ) {
+                auto node_type = tidyNodeGetType(child);
+
+                if (node_type != TidyNode_Start && node_type != TidyNode_End) {
+                    std::cout << "OTHER\n";
+                    tidyDiscardElement(tdoc, child);
+                    repeat = true;
+                    break;
+                }
+
+                const char *name = tidyNodeGetName( child );
+                if (name) {
+                    std::cout << name << "\n";
+
+                    if (!strcasecmp("html", name)) {
+                        if (tidyNodeGetText(tdoc, child, &tidy_buffer)) {
+                            framework.assign((const char *) tidy_buffer.bp, tidy_buffer.size);
+                            break;
+                        }
+                    }
+                }
+                else std::cout << "other\n";
+            }
+
+            if (!repeat) break;
+        }
+
+        //tidySaveBuffer( tdoc, &tidy_buffer );
+
+
+        tidyRelease( tdoc );
+        tidyBufFree( &tidy_buffer );
+    }
+
+    //std::cout << framework << "\n";
+
+
+    tinyxml2::XMLDocument doc;
+    doc.Parse(framework.c_str(), framework.size());
+    tinyxml2::XMLElement *parent = doc.RootElement();
+
+    if (!parent) {
+        std::cerr << path << ": unacceptable content\n";
+        return false;
+    }
+
+    tinyxml2::XMLElement *content = find_if(
+        *parent,
+        [](const tinyxml2::XMLElement &el, int) {
+            const char *name = el.Name();
+
+            if (name && strcasecmp("div", name)) {
+                return false;
+            }
+
+            const char *id = "";
+
+            if (el.QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
+                return false;
+            }
+
+            if (id && !strcasecmp("content", id)) {
+                return true;
+            }
+
+            return false;
+        }
+    );
+
+    if (content) {
+        content->DeleteChildren();
+
+        for (const tinyxml2::XMLDocument &section : sections) {
+            const tinyxml2::XMLElement *root = section.RootElement();
+            tinyxml2::XMLNode *node = root->DeepClone(&doc);
+
+            if (node) {
+                content->InsertEndChild(node);
+            }
+        }
+    }
+
+    tinyxml2::XMLPrinter printer;
+    doc.Print(&printer);
+    std::string output(printer.CStr());
+
+    std::cout << output << "\n";
+
+    return true;
+}
+
+tinyxml2::XMLElement *find_if(
     const tinyxml2::XMLElement &root,
     std::function<bool(const tinyxml2::XMLElement &, int)> fun
 ) {
@@ -258,7 +397,7 @@ const tinyxml2::XMLElement *find_if(
 
     while (parent) {
         if (fun(*parent, depth)) {
-            return parent;
+            return const_cast<tinyxml2::XMLElement *>(parent);
         }
 
         const tinyxml2::XMLElement *child = parent->FirstChildElement();
