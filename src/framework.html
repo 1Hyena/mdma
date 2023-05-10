@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+    --smallest-width: 320px;
+    --content-padding: 10vmin;
+    --content-width: max(min(100vh - var(--content-padding), 100vw), 72vw);
+    --content-height: min(
+        max(
+            100vh - var(--content-padding),
+            200vh - var(--content-padding) - 100vw
+        ), 100vh
+    );
+    --menu-width: 10rem;
+}
+
+*, ::before, ::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height:100%;
+    width:100%;
+    overflow: hidden;
+}
+
+body {
+    background: linear-gradient(to right, silver, gray);
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center center;
+    text-align: right;
+    white-space: nowrap;
+}
+
+body > span:first-child {
+    height: 100%;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.container {
+    position: relative;
+    display: inline-block;
+    overflow: hidden;
+    width: var(--content-width);
+    height: var(--content-height);
+    vertical-align: middle;
+}
+
+#width-guard {
+    position: absolute;
+    display: inline-block;
+    top: 0;
+    left: 0;
+    width: calc(
+        (
+            var(--smallest-width) + var(--menu-width) - var(--content-width)
+        ) * 10000
+    );
+    min-width: 0px;
+    max-width: 1px;
+    container-type: inline-size;
+}
+
+#width-guard > div {
+    position: absolute;
+    display: inline-block;
+    top: 0;
+    left: 0;
+    width: var(--content-width);
+    height: var(--content-height);
+}
+
+#content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    text-align: left;
+    scroll-behavior: smooth;
+    overflow-y: scroll;
+    z-index: 0;
+    background: rgba(255, 255, 255, 0.5);
+    border-top-left-radius: 1rem;
+    border-bottom-left-radius: 1rem;
+    border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
+    border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
+}
+
+#burger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: none;
+}
+
+.menu {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: clamp(
+        min(3rem, var(--menu-width)), 100%, min(var(--menu-width), 100%)
+    );
+    z-index: 1;
+    pointer-events: none;
+    overflow: visible;
+    transition: width 0.1s linear;
+}
+
+.options {
+    position: absolute;
+    top: 0.125rem;
+    right: 0;
+    width: 100%;
+    background-color: orange;
+    text-align: left;
+    pointer-events: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(100% - 0.25rem);
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
+    border-top-left-radius: 1rem;
+    border-bottom-left-radius: 1rem;
+    border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
+    border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
+    padding: 0.5rem;
+}
+
+.content {
+    width: 400px;
+    background-color: green;
+    height: 400px;
+}
+
+.tab {
+    position: relative;
+    display: block;
+    width: max(var(--content-width) - var(--menu-width), 0%);
+    overflow: hidden;
+    padding: 1rem;
+}
+
+.tab:not(:has(a:target)) {
+    display: none;
+}
+
+#content:not(:has(a:target)) > :first-child {
+    display: block;
+}
+
+.tab > a:target + .content {
+    background-color: yellow;
+}
+
+.menu > .options a + div {
+    max-height: 100vh;
+    transition: max-height 0.3s ease-in;
+    overflow: hidden;
+}
+
+label[for="burger"] {
+    display: block;
+    text-align: right;
+    pointer-events: none;
+}
+
+label[for="burger"]::after {
+    content: "✖";
+    opacity: 0;
+    transition: opacity 0.1s linear;
+}
+
+@container (min-width: 1px) {
+    label[for="burger"] {
+        pointer-events: all;
+    }
+
+    label[for="burger"]::after {
+        opacity: 1;
+    }
+
+    :not(#burger:checked) + .menu > .options > label[for="burger"]::after {
+        content: "☰";
+    }
+
+    :not(#burger:checked) + .menu{
+        width: min(3rem, var(--menu-width));
+    }
+
+    .tab {
+        width: 100%;
+    }
+}
+</style>
+<style>
+#content:has(#example1:target) ~ .menu a[href="#example1"],
+#content:has(#example2:target) ~ .menu a[href="#example2"],
+#content:has(#example3:target) ~ .menu a[href="#example3"],
+#content:has(#example4:target) ~ .menu a[href="#example4"],
+#content:has(#example4-1:target) ~ .menu a[href="#example4-1"],
+#content:has(#example4-2:target) ~ .menu a[href="#example4-2"],
+#content:has(#example4-3:target) ~ .menu a[href="#example4-3"],
+#content:has(#example4-4:target) ~ .menu a[href="#example4-4"],
+#content:has(#example4-4-1:target) ~ .menu a[href="#example4-4-1"],
+#content:has(#example5:target) ~ .menu a[href="#example5"] {
+    color: green;
+}
+
+#content:not(
+    :has(#example4:target),
+    :has(#example4-1:target),
+    :has(#example4-2:target),
+    :has(#example4-3:target),
+    :has(#example4-4:target),
+    :has(#example4-4-1:target)
+) ~ .menu > .options a[href="#example4"] + div,
+#content:not(
+    :has(#example4-4:target),
+    :has(#example4-4-1:target)
+) ~ .menu > .options a[href="#example4-4"] + div {
+    max-height: 0;
+    transition: max-height 0.2s ease-out;
+}
+</style>
+</head>
+
+<body><!--
+--><span></span><!--
+--><div class="container"><!--
+    --><div id="width-guard"><div><!--
+        --><div id="content"><!--
+            --><div class="tab"><!--
+                --><a id="example1" href="#example1"><!--
+                    -->Example 1<!--
+                --></a><div class="content"></div><!--
+            --></div><!--
+            --><div class="tab"><!--
+                --><a id="example2" href="#example2"><!--
+                    -->Example 2<!--
+                --></a><div class="content"></div><!--
+            --></div><!--
+            --><div class="tab"><!--
+                --><a id="example3" href="#example3"><!--
+                    -->Example 3<!--
+                --></a><div class="content"></div><!--
+            --></div><!--
+            --><div class="tab"><!--
+                --><a id="example4" href="#example4"><!--
+                    -->Example 4<!--
+                --></a><div class="content"></div><!--
+                --><a id="example4-1" href="#example4-1"><!--
+                    -->Example 4.1<!--
+                --></a><div class="content"></div><!--
+                --><a id="example4-2" href="#example4-2"><!--
+                    -->Example 4.2<!--
+                --></a><div class="content"></div><!--
+                --><a id="example4-3" href="#example4-3"><!--
+                    -->Example 4.3<!--
+                --></a><div class="content"></div><!--
+                --><a id="example4-4" href="#example4-4"><!--
+                    -->Example 4.4<!--
+                --></a><div class="content"></div><!--
+                --><a id="example4-4-1" href="#example4-4-1"><!--
+                    -->Example 4.4.1<!--
+                --></a><div class="content"></div><!--
+            --></div><!--
+            --><div class="tab"><!--
+                --><a id="example5" href="#example5"><!--
+                    -->Example 5<!--
+                --></a><div class="content"></div><!--
+            --></div><!--
+        --></div><!--
+        --><input type="checkbox" name="burger" id="burger" value="value"><!--
+        --><div class="menu"><!--
+            --><div class="options"><!--
+                --><label for="burger"></label><!--
+                --><div id="agenda"><!--
+                    --><a href="#example1"><h3>Example 1</h3></a><!--
+                    --><a href="#example2"><h3>Example 2</h3></a><!--
+                    --><a href="#example3"><h3>Example 3</h3></a><!--
+                    --><a href="#example4"><h3>Example 4</h3></a><!--
+                    --><div><!--
+                        --><a href="#example4-1"><h4>Example 4.1</h4></a><!--
+                        --><a href="#example4-2"><h4>Example 4.2</h4></a><!--
+                        --><a href="#example4-3"><h4>Example 4.3</h4></a><!--
+                        --><a href="#example4-4"><h4>Example 4.4</h4></a><!--
+                        --><div><!--
+                            --><a href="#example4-4-1"><!--
+                                --><h5>Example 4.4.1</h5><!--
+                            --></a><!--
+                        --></div><!--
+                    --></div><!--
+                    --><a href="#example5"><h3>Example 5</h3></a><!--
+                --></div><!--
+            --></div><!--
+        --></div><!--
+    --></div></div><!--
+--></div><!--
+--></body>
+</html>
