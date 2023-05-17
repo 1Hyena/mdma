@@ -172,7 +172,7 @@ bool parse_markdown(
                 sections.emplace_back();
 
                 node = sections.back().InsertFirstChild(
-                    sections.back().NewElement("div")
+                    sections.back().NewElement("article")
                 );
 
                 elem = node ? node->ToElement() : nullptr;
@@ -332,7 +332,7 @@ void assemble_framework_body(
         }
     }
 
-    tinyxml2::XMLPrinter printer;
+    tinyxml2::XMLPrinter printer(nullptr, true);
     doc.Print(&printer);
 
     body_html.assign(printer.CStr());
