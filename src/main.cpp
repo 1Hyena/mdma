@@ -227,9 +227,18 @@ void assemble_framework_body(
     std::string &body_html, const std::list<tinyxml2::XMLDocument> &sections,
     const std::map<std::string, std::string> &headings
 ) {
+    static constexpr const char *smallest_valid_html5{
+        "<!DOCTYPE html><title>x</title>"
+    };
+
     tinyxml2::XMLDocument doc;
 
     {
+        // Let's convert HTML to XML.
+
+        std::string html5(smallest_valid_html5);
+        html5.append(body_html);
+
         TidyBuffer tidy_buffer{};
         TidyDoc tdoc_xml = tidyCreate();
 
@@ -238,10 +247,9 @@ void assemble_framework_body(
         tidyOptSetBool(tdoc_xml, TidyDropEmptyElems, no);
         tidyOptSetBool(tdoc_xml, TidyDropEmptyParas, no);
         tidyOptSetBool(tdoc_xml, TidyXmlOut, yes);
-        tidyParseString(tdoc_xml, body_html.c_str());
+        tidyParseString(tdoc_xml, html5.c_str());
 
         TidyNode body_node = tidyGetBody(tdoc_xml);
-
         tidyNodeGetText(tdoc_xml, body_node, &tidy_buffer);
 
         doc.Parse((const char *) tidy_buffer.bp, tidy_buffer.size);
@@ -340,6 +348,9 @@ void assemble_framework_body(
     {
         // Let's convert XML to HTML.
 
+        std::string html5(smallest_valid_html5);
+        html5.append(body_html);
+
         TidyBuffer tidy_buffer{};
         TidyDoc tdoc = tidyCreate();
 
@@ -347,8 +358,7 @@ void assemble_framework_body(
         tidyOptSetBool(tdoc, TidyMergeSpans, no);
         tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
         tidyOptSetBool(tdoc, TidyDropEmptyParas, no);
-
-        tidyParseString( tdoc, body_html.c_str() );
+        tidyParseString( tdoc, html5.c_str() );
 
         TidyNode body = tidyGetBody(tdoc);
 
