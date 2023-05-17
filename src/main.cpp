@@ -16,12 +16,12 @@
 
 bool parse_framework(
     const std::string &path, const std::list<tinyxml2::XMLDocument> &sections,
-    const std::map<std::string, std::string> &headings
+    const std::map<int, std::string> &headings
 );
 
 bool parse_markdown(
     const std::string &path, std::list<tinyxml2::XMLDocument> &sections,
-    std::function<std::string(const tinyxml2::XMLElement &heading)> callback
+    std::function<int(const tinyxml2::XMLElement &heading)> callback
 );
 
 int main(int argc, char **argv) {
@@ -44,20 +44,19 @@ int main(int argc, char **argv) {
 
     int next_id = 1;
     std::list<tinyxml2::XMLDocument> sections;
-    std::map<std::string, std::string> headings;
+    std::map<int, std::string> headings;
 
     fail = (
         !parse_markdown(
             options.file, sections,
             [&next_id, &headings](const tinyxml2::XMLElement &heading) {
-                std::string id{"anchor-"};
-                id.append(std::to_string(next_id++));
-
                 const char *title = heading.GetText();
 
-                if (title) {
-                    headings.emplace(id, std::string(title));
-                }
+                if (!title) return 0;
+
+                int id = next_id++;
+
+                headings.emplace(id, std::string(title));
 
                 return id;
             }
@@ -80,7 +79,7 @@ tinyxml2::XMLElement *find_if(
 
 bool parse_markdown(
     const std::string &path, std::list<tinyxml2::XMLDocument> &sections,
-    std::function<std::string(const tinyxml2::XMLElement &heading)> callback
+    std::function<int(const tinyxml2::XMLElement &heading)> callback
 ) {
     std::string markdown;
 
@@ -193,7 +192,11 @@ bool parse_markdown(
                 elem = node ? node->ToElement() : nullptr;
 
                 if (elem) {
-                    std::string id(callback(*sibling));
+                    std::string id(
+                        std::string("anchor-").append(
+                            std::to_string(callback(*sibling))
+                        )
+                    );
 
                     elem->SetAttribute("id", id.c_str());
                     elem->SetAttribute(
@@ -225,7 +228,7 @@ bool parse_markdown(
 
 void assemble_framework_body(
     std::string &body_html, const std::list<tinyxml2::XMLDocument> &sections,
-    const std::map<std::string, std::string> &headings
+    const std::map<int, std::string> &headings
 ) {
     static constexpr const char *smallest_valid_html5{
         "<!DOCTYPE html><title>x</title>"
@@ -331,7 +334,10 @@ void assemble_framework_body(
 
             if (elem) {
                 elem->SetAttribute(
-                    "href", std::string("#").append(p.first).c_str()
+                    "href",
+                    std::string("#anchor-").append(
+                        std::to_string(p.first)
+                    ).c_str()
                 );
 
                 elem->InsertNewText(p.second.c_str());
@@ -414,7 +420,7 @@ TidyNode find_if(TidyNode root, std::function<bool(const TidyNode &, int)> fun);
 
 bool parse_framework(
     const std::string &path, const std::list<tinyxml2::XMLDocument> &sections,
-    const std::map<std::string, std::string> &headings
+    const std::map<int, std::string> &headings
 ) {
     auto default_framework{std::to_array<unsigned char>({ MDMA_FRAMEWORK })};
     std::string framework;
@@ -473,7 +479,10 @@ bool parse_framework(
     size_t heading_counter = 0;
 
     for (const auto &p : headings) {
-        const std::string &anchor_id = p.first;
+        std::string anchor_id(
+            std::string("anchor-").append(std::to_string(p.first))
+        );
+
         ++heading_counter;
 
         agenda_css.append("#MDMA-CONTENT:has(#").append(anchor_id).append(
