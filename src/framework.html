@@ -16,6 +16,7 @@
         ), 100vh
     );
     --menu-width: 10rem;
+    --menu-burger-width: 2rem;
 }
 
 *, ::before, ::after {
@@ -111,7 +112,9 @@ body > span:first-child {
     right: 0;
     bottom: 0;
     width: clamp(
-        min(3rem, var(--menu-width)), 100%, min(var(--menu-width), 100%)
+        min(var(--menu-burger-width), var(--menu-width)),
+        100%,
+        min(var(--menu-width), 100%)
     );
     z-index: 1;
     pointer-events: none;
@@ -155,6 +158,7 @@ body > span:first-child {
     width: max(var(--content-width) - var(--menu-width), 0%);
     overflow: visible;
     padding: 1rem;
+    padding-right: var(--menu-burger-width);
     white-space: normal;
 }
 
@@ -207,7 +211,7 @@ label[for="burger"]::after {
     }
 
     :not(#burger:checked) + .menu{
-        width: min(3rem, var(--menu-width));
+        width: min(var(--menu-burger-width), var(--menu-width));
     }
 
     .tab {
