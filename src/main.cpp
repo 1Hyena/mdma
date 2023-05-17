@@ -340,6 +340,44 @@ void assemble_framework_body(
         }
     }
 
+    find_if(
+        *parent,
+        [](const tinyxml2::XMLElement &el, int) {
+            const char *name = el.Name();
+
+            if (name && strcasecmp("td", name) && strcasecmp("th", name)) {
+                return false;
+            }
+
+            const char *align = "";
+            tinyxml2::XMLError err = el.QueryStringAttribute("align", &align);
+
+            if (err != tinyxml2::XML_SUCCESS) {
+                return false;
+            }
+
+            if (align
+            && strcasecmp("left", align)
+            && strcasecmp("right", align)
+            && strcasecmp("center", align)) {
+                return false;
+            }
+
+            tinyxml2::XMLElement *fix_el{
+                const_cast<tinyxml2::XMLElement *>(&el)
+            };
+
+            fix_el->SetAttribute(
+                "style",
+                std::string("text-align: ").append(align).append(";").c_str()
+            );
+
+            fix_el->DeleteAttribute("align");
+
+            return false;
+        }
+    );
+
     tinyxml2::XMLPrinter printer(nullptr, true);
     doc.Print(&printer);
 
@@ -616,7 +654,7 @@ TidyNode find_if(
 
     while (parent) {
         if (fun(parent, depth)) {
-            return const_cast<TidyNode>(parent);;
+            return const_cast<TidyNode>(parent);
         }
 
         const TidyNode child = tidyGetChild(parent);
