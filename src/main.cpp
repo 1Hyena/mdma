@@ -16,12 +16,16 @@
 
 bool parse_framework(
     const std::string &path, const std::list<tinyxml2::XMLDocument> &sections,
-    const std::map<int, std::string> &headings
+    const std::map<int, std::pair<int, std::string>> &headings
 );
 
 bool parse_markdown(
     const std::string &path, std::list<tinyxml2::XMLDocument> &sections,
     std::function<int(const tinyxml2::XMLElement &heading)> callback
+);
+
+int add_heading_and_get_parent_id(
+    int id, int level, std::map<int, int> &level_to_id
 );
 
 int main(int argc, char **argv) {
@@ -44,24 +48,46 @@ int main(int argc, char **argv) {
 
     int next_id = 1;
     std::list<tinyxml2::XMLDocument> sections;
-    std::map<int, std::string> headings;
+    std::map<int, std::pair<int, std::string>> headings;
 
-    fail = (
-        !parse_markdown(
-            options.file, sections,
-            [&next_id, &headings](const tinyxml2::XMLElement &heading) {
-                const char *title = heading.GetText();
+    {
+        std::map<int, int> level_to_id;
 
-                if (!title) return 0;
+        fail = (
+            !parse_markdown(
+                options.file, sections,
+                [&](const tinyxml2::XMLElement &heading) {
+                    const char *title = heading.GetText();
+                    const char *name = heading.Name();
 
-                int id = next_id++;
+                    if (!title || !name) return 0;
 
-                headings.emplace(id, std::string(title));
+                    int level = (
+                        !strcasecmp("h1", name) ? 1 :
+                        !strcasecmp("h2", name) ? 2 :
+                        !strcasecmp("h3", name) ? 3 :
+                        !strcasecmp("h4", name) ? 4 :
+                        !strcasecmp("h5", name) ? 5 :
+                        !strcasecmp("h6", name) ? 6 : 7
+                    );
 
-                return id;
-            }
-        )
-    );
+                    int id = next_id++;
+
+                    headings.emplace(
+                        id,
+                        std::make_pair(
+                            add_heading_and_get_parent_id(
+                                id, level, level_to_id
+                            ),
+                            std::string(title)
+                        )
+                    );
+
+                    return id;
+                }
+            )
+        );
+    }
 
     if (fail) return EXIT_FAILURE;
 
@@ -192,18 +218,21 @@ bool parse_markdown(
                 elem = node ? node->ToElement() : nullptr;
 
                 if (elem) {
-                    std::string id(
-                        std::string("anchor-").append(
-                            std::to_string(callback(*sibling))
-                        )
-                    );
+                    int id = callback(*sibling);
 
-                    elem->SetAttribute("id", id.c_str());
-                    elem->SetAttribute(
-                        "href", std::string("#").append(id).c_str()
-                    );
+                    if (id > 0) {
+                        std::string anchor_id(
+                            std::string("anchor-").append(std::to_string(id))
+                        );
 
-                    root = elem;
+                        elem->SetAttribute("id", anchor_id.c_str());
+                        elem->SetAttribute(
+                            "href", std::string("#").append(anchor_id).c_str()
+                        );
+
+                        root = elem;
+                    }
+                    else raise(SIGSEGV);
                 }
                 else raise(SIGSEGV);
             }
@@ -228,7 +257,7 @@ bool parse_markdown(
 
 void assemble_framework_body(
     std::string &body_html, const std::list<tinyxml2::XMLDocument> &sections,
-    const std::map<int, std::string> &headings
+    const std::map<int, std::pair<int, std::string>> &headings
 ) {
     static constexpr const char *smallest_valid_html5{
         "<!DOCTYPE html><title>x</title>"
@@ -325,8 +354,41 @@ void assemble_framework_body(
     if (agenda) {
         agenda->DeleteChildren();
 
+        std::map<int, tinyxml2::XMLElement*> groups{{0, agenda}};
+
         for (const auto &p : headings) {
-            tinyxml2::XMLNode *node = agenda->InsertEndChild(
+            int parent_id = p.second.first;
+            tinyxml2::XMLElement *container = std::prev(groups.end())->second;
+
+            if (groups.count(parent_id)) {
+                container = groups.at(parent_id);
+
+                while (!groups.empty()) {
+                    int group_id = std::prev(groups.end())->first;
+
+                    if (group_id != parent_id) {
+                        groups.erase(group_id);
+                        continue;
+                    }
+
+                    break;
+                }
+            }
+            else {
+                tinyxml2::XMLNode *node = container->InsertEndChild(
+                    doc.NewElement("div")
+                );
+
+                tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
+
+                if (elem) {
+                    groups.emplace(parent_id, elem);
+                    container = elem;
+                }
+                else raise(SIGSEGV);
+            }
+
+            tinyxml2::XMLNode *node = container->InsertEndChild(
                 doc.NewElement("a")
             );
 
@@ -340,7 +402,7 @@ void assemble_framework_body(
                     ).c_str()
                 );
 
-                elem->InsertNewText(p.second.c_str());
+                elem->InsertNewText(p.second.second.c_str());
             }
             else raise(SIGSEGV);
         }
@@ -420,7 +482,7 @@ TidyNode find_if(TidyNode root, std::function<bool(const TidyNode &, int)> fun);
 
 bool parse_framework(
     const std::string &path, const std::list<tinyxml2::XMLDocument> &sections,
-    const std::map<int, std::string> &headings
+    const std::map<int, std::pair<int, std::string>> &headings
 ) {
     auto default_framework{std::to_array<unsigned char>({ MDMA_FRAMEWORK })};
     std::string framework;
@@ -458,10 +520,14 @@ bool parse_framework(
         TidyNode style = find_if(
             tidyGetHead(tdoc),
             [](const TidyNode &node, int) {
+                if (tidyNodeGetId(node) != TidyTag_STYLE) {
+                    return false;
+                }
+
                 TidyAttr attr = tidyAttrGetById(node, TidyAttr_CLASS);
 
                 if (attr
-                && !strcasecmp(tidyAttrValue(attr), "MDMA-REJECT")) {
+                && !strcasecmp(tidyAttrValue(attr), "MDMA-AUTOGENERATED")) {
                     return true;
                 }
 
@@ -477,8 +543,15 @@ bool parse_framework(
 
     std::string agenda_css;
     size_t heading_counter = 0;
+    std::map<int, std::vector<int>> heading_to_descendants;
 
     for (const auto &p : headings) {
+        int parent_id = p.second.first;
+
+        if (parent_id) {
+            heading_to_descendants[parent_id].emplace_back(p.first);
+        }
+
         std::string anchor_id(
             std::string("anchor-").append(std::to_string(p.first))
         );
@@ -491,6 +564,65 @@ bool parse_framework(
 
         if (heading_counter == headings.size()) {
             agenda_css.append(" {\n").append("    color: green;\n}\n");
+        }
+        else {
+            agenda_css.append(",\n");
+        }
+    }
+
+    for (auto &p : heading_to_descendants) {
+        std::vector<int> &descendants = p.second;
+
+        for (size_t i=0; i<descendants.size(); ++i) {
+            int descendant_id = descendants[i];
+
+            if (heading_to_descendants.count(descendant_id)) {
+                for (int id : heading_to_descendants[descendant_id]) {
+                    descendants.emplace_back(id);
+                }
+            }
+        }
+    }
+
+    while (!heading_to_descendants.empty()) {
+        int heading_id = heading_to_descendants.begin()->first;
+        std::vector<int> &descendants = heading_to_descendants.at(heading_id);
+
+        agenda_css.append("#MDMA-CONTENT:not(\n");
+        agenda_css.append("    :has(#anchor-").append(
+            std::to_string(heading_id)
+        ).append(":target),\n");
+
+        while (!descendants.empty()) {
+            int descendant_id = descendants.back();
+
+            agenda_css.append("    :has(#anchor-").append(
+                std::to_string(descendant_id)
+            ).append(":target)");
+
+            descendants.pop_back();
+
+            if (descendants.empty()) {
+                agenda_css.append("\n");
+            }
+            else {
+                agenda_css.append(",\n");
+            }
+        }
+
+        agenda_css.append(") ~ .menu > .options a[href=\"#anchor-").append(
+            std::to_string(heading_id)
+        ).append("\"] + div");
+
+        heading_to_descendants.erase(heading_id);
+
+        if (heading_to_descendants.empty()) {
+            agenda_css.append(
+                " {\n"
+                "    max-height: 0;\n"
+                "    transition: max-height 0.2s ease-out;\n"
+                "}\n"
+            );
         }
         else {
             agenda_css.append(",\n");
@@ -539,7 +671,9 @@ bool parse_framework(
                         framework.append("<head>\n");
 
                         if (!headings.empty()) {
-                            end_tags[depth].append("<style>\n").append(
+                            end_tags[depth].append(
+                                "<style class=\"MDMA-AUTOGENERATED\">\n"
+                            ).append(
                                 agenda_css
                             ).append("</style>\n");
                         }
@@ -696,4 +830,26 @@ TidyNode find_if(
     }
 
     return {};
+}
+
+int add_heading_and_get_parent_id(
+    int id, int level, std::map<int, int> &level_to_id
+) {
+    int last_id = 0;
+
+    while (!level_to_id.empty()) {
+        int last_level = std::prev(level_to_id.end())->first;
+
+        if (last_level >= level) {
+            level_to_id.erase(last_level);
+            continue;
+        }
+
+        last_id = level_to_id.at(last_level);
+        break;
+    }
+
+    level_to_id[level] = id;
+
+    return last_id;
 }
