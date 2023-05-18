@@ -29,3 +29,17 @@ Options:
   -v  --version       Show version information.
 
 ```
+
+# Dependencies #################################################################
+
+In order to compile this program from its _Makefile_ the following libraries and
+their respective header files must be present in the system.
+
+* [md4c](https://github.com/mity/md4c) —
+  C Markdown parser
+
+* [tinyxml2](https://github.com/leethomason/tinyxml2) —
+  Simple XML parser made for easy integration
+
+* [tidy](https://www.html-tidy.org/) —
+  A tool to tidy down HTML code to a clean style
