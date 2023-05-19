@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="generator" content=
+    "HTML Tidy for HTML5 for Linux version 5.7.45">
+    <title>
+      Default Framework
+    </title>
+    <meta http-equiv="content-type" content=
+    "text/html; charset=utf-8">
+    <meta name="viewport" content=
+    "width=device-width, initial-scale=1">
+    <style>
+    :root {
+    --smallest-width: 320px;
+    --content-padding: 10vmin;
+    --content-width: max(min(100vh - var(--content-padding), 100vw), 72vw);
+    --content-height: min(
+        max(
+            100vh - var(--content-padding),
+            200vh - var(--content-padding) - 100vw
+        ), 100vh
+    );
+    --menu-width: 10rem;
+    --menu-burger-width: 2rem;
+    }
+
+    *, ::before, ::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    }
+
+    html, body {
+    height:100%;
+    width:100%;
+    overflow: hidden;
+    }
+
+    body {
+    background: linear-gradient(to right, silver, gray);
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center center;
+    text-align: right;
+    white-space: nowrap;
+    }
+
+    body > span:first-child {
+    height: 100%;
+    display: inline-block;
+    vertical-align: middle;
+    }
+
+    .container {
+    position: relative;
+    display: inline-block;
+    overflow: hidden;
+    width: var(--content-width);
+    height: var(--content-height);
+    vertical-align: middle;
+    }
+
+    #width-guard {
+    position: absolute;
+    display: inline-block;
+    top: 0;
+    left: 0;
+    width: calc(
+        (
+            var(--smallest-width) + var(--menu-width) - var(--content-width)
+        ) * 10000
+    );
+    min-width: 0px;
+    max-width: 1px;
+    container-type: inline-size;
+    }
+
+    #width-guard > div {
+    position: absolute;
+    display: inline-block;
+    top: 0;
+    left: 0;
+    width: var(--content-width);
+    height: var(--content-height);
+    }
+
+    #MDMA-CONTENT {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    text-align: left;
+    scroll-behavior: smooth;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    z-index: 0;
+    background: rgba(255, 255, 255, 0.5);
+    border-top-left-radius: 1rem;
+    border-bottom-left-radius: 1rem;
+    border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
+    border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
+    }
+
+    #burger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: none;
+    }
+
+    .menu {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: clamp(
+        min(var(--menu-burger-width), var(--menu-width)),
+        100%,
+        min(var(--menu-width), 100%)
+    );
+    z-index: 1;
+    pointer-events: none;
+    overflow: visible;
+    transition: width 0.1s linear;
+    }
+
+    .options {
+    position: absolute;
+    top: 0.125rem;
+    right: 0;
+    width: 100%;
+    background-color: orange;
+    text-align: left;
+    pointer-events: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(100% - 0.25rem);
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
+    border-top-left-radius: 1rem;
+    border-bottom-left-radius: 1rem;
+    border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
+    border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
+    padding: 0.5rem;
+    padding-right: 0;
+    }
+
+    #MDMA-AGENDA a {
+    display: block;
+    }
+
+    .example-content {
+    width: 400px;
+    background-color: green;
+    height: 400px;
+    }
+
+    .tab {
+    position: relative;
+    display: block;
+    width: max(var(--content-width) - var(--menu-width), 0%);
+    overflow: visible;
+    padding: 1rem;
+    padding-right: var(--menu-burger-width);
+    white-space: normal;
+    }
+
+    .tab img {
+    max-width: 100%;
+    max-height: 100%;
+    }
+
+    .tab:not(:has(a:target)) {
+    display: none;
+    }
+
+    #MDMA-CONTENT:not(:has(a:target)) > :first-child {
+    display: block;
+    }
+
+    .tab > a:target + .example-content {
+    background-color: yellow;
+    }
+
+    .menu > .options a + div {
+    max-height: 100vh;
+    transition: max-height 0.3s ease-in;
+    overflow: hidden;
+    }
+
+    label[for="burger"] {
+    display: block;
+    text-align: right;
+    pointer-events: none;
+    padding-right: 0.5rem;
+    }
+
+    label[for="burger"]::after {
+    content: "✖";
+    opacity: 0;
+    transition: opacity 0.1s linear;
+    }
+
+    @container (min-width: 1px) {
+    label[for="burger"] {
+        pointer-events: all;
+    }
+
+    label[for="burger"]::after {
+        opacity: 1;
+    }
+
+    :not(#burger:checked) + .menu > .options > label[for="burger"]::after {
+        content: "☰";
+    }
+
+    :not(#burger:checked) + .menu{
+        width: min(var(--menu-burger-width), var(--menu-width));
+    }
+
+    .tab {
+        width: 100%;
+    }
+    }
+    </style>
+    <style class="MDMA-AUTOGENERATED">
+    #MDMA-CONTENT:has(#anchor-1:target) ~ .menu a[href="#anchor-1"],
+    #MDMA-CONTENT:has(#anchor-2:target) ~ .menu a[href="#anchor-2"],
+    #MDMA-CONTENT:has(#anchor-3:target) ~ .menu a[href="#anchor-3"] {
+    color: green;
+    }
+    </style>
+  </head>
+  <body>
+    <span></span>
+    <div class="container">
+      <div id="width-guard">
+        <div>
+          <div id="MDMA-CONTENT">
+            <article class="tab">
+              <a id="anchor-1" href="#anchor-1">
+              <h1>
+                MDMA
+              </h1></a>
+              <p>
+                In this context MDMA stands for "MarkDown Monolith
+                Assembler". It is a command line tool for building
+                elegant browser-based books using the Markdown
+                markup language.
+              </p>
+              <p>
+                When given a markdown document as an input, this
+                program produces a monolithic JavaScript-free HTML5
+                application as an output. For example, from this
+                very <em>readme</em> file an HTML document would be
+                generated that renders as shown in the below
+                screenshot.
+              </p>
+              <table>
+                <thead>
+                  <tr>
+                    <th style="text-align: center;">
+                      <a href=
+                      "https://raw.githack.com/1Hyena/mdma/master/README.html"
+                      title=
+                      "Click to see this document in your web browser">
+                      <img src="screenshot.jpg" alt=
+                      "Screenshot"></a>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="text-align: center;">
+                      Screenshot depicting how this document
+                      renders in the Chromium web browser
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p>
+                To see a live demo of this document in the format
+                of an HTML application, click on the above
+                screenshot and the respective page will open in
+                your web browser.
+              </p>
+            </article>
+            <article class="tab">
+              <a id="anchor-2" href="#anchor-2">
+              <h1>
+                Synopsis
+              </h1></a>
+              <pre><code>Usage: mdma [OPTION]... [FILE]
+Options:
+  -f  --framework     Specify a custom HTML framework file.
+      --brief         Print brief messages (default).
+      --debug         Print debugging messages.
+  -h  --help          Display this usage information.
+      --verbose       Print verbose messages.
+  -v  --version       Show version information.
+
+</code></pre>
+              <p>
+                If the <em>FILE</em> argument is missing, the
+                program will attempt to read a markdown document
+                from its standard input.
+              </p>
+            </article>
+            <article class="tab">
+              <a id="anchor-3" href="#anchor-3">
+              <h1>
+                Dependencies
+              </h1></a>
+              <p>
+                In order to compile this program from its
+                <em>Makefile</em> the following libraries and their
+                respective header files must be present in the
+                system.
+              </p>
+              <ul>
+                <li>
+                  <p>
+                    <a href="https://github.com/mity/md4c">md4c</a>
+                    — C Markdown parser
+                  </p>
+                </li>
+                <li>
+                  <p>
+                    <a href=
+                    "https://github.com/leethomason/tinyxml2">tinyxml2</a>
+                    — Simple XML parser made for easy integration
+                  </p>
+                </li>
+                <li>
+                  <p>
+                    <a href="https://www.html-tidy.org/">tidy</a> —
+                    A tool to tidy down HTML code to a clean style
+                  </p>
+                </li>
+              </ul>
+            </article>
+          </div><input type="checkbox" name="burger" id="burger"
+          value="value">
+          <div class="menu">
+            <div class="options">
+              <label for="burger"></label>
+              <div id="MDMA-AGENDA">
+                <a href="#anchor-1">MDMA</a><a href=
+                "#anchor-2">Synopsis</a><a href=
+                "#anchor-3">Dependencies</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+

@@ -9,9 +9,16 @@ JavaScript-free HTML5 application as an output. For example, from this very
 _readme_ file an HTML document would be generated that renders as shown in the
 below screenshot.
 
-|  ![Screenshot](screenshot.jpg "Screenshot depicting a rendered HTML file")   |
+|                     [![Screenshot][img-demo]][url-demo]                      |
 | :--------------------------------------------------------------------------: |
 |  Screenshot depicting how this document renders in the Chromium web browser  |
+
+[img-demo]: screenshot.jpg
+[url-demo]: https://raw.githack.com/1Hyena/mdma/master/README.html
+            "Click to see this document in your web browser"
+
+To see a live demo of this document in the format of an HTML application, click
+on the above screenshot and the respective page will open in your web browser.
 
 # Synopsis #####################################################################
 
