@@ -1,4 +1,4 @@
 #!/bin/bash
 ./mdma README.md >README.html
-chromium --headless --screenshot=screenshot.png README.html
-magick screenshot.png -gamma 0.8 -alpha set -virtual-pixel transparent -channel A -blur 0x16 -level 50%,100% +channel screenshot.png
+chromium --headless --screenshot=screenshot.jpg README.html
+magick screenshot.jpg -gamma 0.8 -raise 4 -raise 8 -raise 12 screenshot.jpg
