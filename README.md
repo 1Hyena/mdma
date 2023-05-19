@@ -13,7 +13,7 @@ below screenshot.
 | :--------------------------------------------------------------------------: |
 |  Screenshot depicting how this document renders in the Chromium web browser  |
 
-[img-demo]: screenshot.jpg
+[img-demo]: screenshot.png
 [url-demo]: https://raw.githack.com/1Hyena/mdma/master/README.html
             "Click to see this document in your web browser"
 
