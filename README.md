@@ -15,9 +15,6 @@ below screenshot.
 
 # Synopsis #####################################################################
 
-If the _FILE_ argument is missing, the program will attempt to read a markdown
-document from its standard input.
-
 ```
 Usage: mdma [OPTION]... [FILE]
 Options:
@@ -29,6 +26,9 @@ Options:
   -v  --version       Show version information.
 
 ```
+
+If the _FILE_ argument is missing, the program will attempt to read a markdown
+document from its standard input.
 
 # Dependencies #################################################################
 
