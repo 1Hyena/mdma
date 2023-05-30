@@ -31,13 +31,13 @@
     padding: 0;
     }
 
-    html, body {
+    html, body, .container {
     height:100%;
     width:100%;
     overflow: hidden;
     }
 
-    body {
+    .container {
     background: linear-gradient(to right, silver, gray);
     background-repeat: no-repeat;
     background-size: cover;
@@ -46,13 +46,13 @@
     white-space: nowrap;
     }
 
-    body > span:first-child {
+    .container > span:first-child {
     height: 100%;
     display: inline-block;
     vertical-align: middle;
     }
 
-    .container {
+    .content {
     position: relative;
     display: inline-block;
     overflow: hidden;
@@ -153,12 +153,6 @@
     display: block;
     }
 
-    .example-content {
-    width: 400px;
-    background-color: green;
-    height: 400px;
-    }
-
     .tab {
     position: relative;
     display: block;
@@ -180,10 +174,6 @@
 
     #MDMA-CONTENT:not(:has(a:target)) > :first-child {
     display: block;
-    }
-
-    .tab > a:target + .example-content {
-    background-color: yellow;
     }
 
     .menu > .options a + div {
@@ -236,65 +226,66 @@
     </style>
   </head>
   <body>
-    <span></span>
     <div class="container">
-      <div id="width-guard">
-        <div>
-          <div id="MDMA-CONTENT">
-            <article class="tab">
-              <a id="anchor-1" href="#anchor-1">
-              <h1>
-                MDMA
-              </h1></a>
-              <p>
-                In this context MDMA stands for "MarkDown Monolith
-                Assembler". It is a command line tool for building
-                elegant browser-based books using the Markdown
-                markup language.
-              </p>
-              <p>
-                When given a markdown document as an input, this
-                program produces a monolithic JavaScript-free HTML5
-                application as an output. For example, from this
-                very <em>readme</em> file an HTML document would be
-                generated that renders as shown in the below
-                screenshot.
-              </p>
-              <table>
-                <thead>
-                  <tr>
-                    <th style="text-align: center;">
-                      <a href=
-                      "https://raw.githack.com/1Hyena/mdma/master/framework.html"
-                      title=
-                      "Click to see this document in your web browser">
-                      <img src="screenshot.jpg" alt=
-                      "Screenshot"></a>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style="text-align: center;">
-                      Screenshot depicting how this document
-                      renders in the Chromium web browser
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <p>
-                To see a live demo of this document in the format
-                of an HTML application, click on the above
-                screenshot and the respective page will open in
-                your web browser.
-              </p>
-            </article>
-            <article class="tab">
-              <a id="anchor-2" href="#anchor-2">
-              <h1>
-                Synopsis
-              </h1></a>
-              <pre><code>Usage: mdma [OPTION]... [FILE]
+      <span></span>
+      <div class="content">
+        <div id="width-guard">
+          <div>
+            <div id="MDMA-CONTENT">
+              <article class="tab">
+                <a id="anchor-1" href="#anchor-1">
+                <h1>
+                  MDMA
+                </h1></a>
+                <p>
+                  In this context MDMA stands for "MarkDown
+                  Monolith Assembler". It is a command line tool
+                  for building elegant browser-based books using
+                  the Markdown markup language.
+                </p>
+                <p>
+                  When given a markdown document as an input, this
+                  program produces a monolithic JavaScript-free
+                  HTML5 application as an output. For example, from
+                  this very <em>readme</em> file an HTML document
+                  would be generated that renders as shown in the
+                  below screenshot.
+                </p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="text-align: center;">
+                        <a href=
+                        "https://raw.githack.com/1Hyena/mdma/master/framework.html"
+                        title=
+                        "Click to see this document in your web browser">
+                        <img src="screenshot.jpg" alt=
+                        "Screenshot"></a>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="text-align: center;">
+                        Screenshot depicting how this document
+                        renders in the Chromium web browser
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p>
+                  To see a live demo of this document in the format
+                  of an HTML application, click on the above
+                  screenshot and the respective page will open in
+                  your web browser.
+                </p>
+              </article>
+              <article class="tab">
+                <a id="anchor-2" href="#anchor-2">
+                <h1>
+                  Synopsis
+                </h1></a>
+                <pre><code>Usage: mdma [OPTION]... [FILE]
 Options:
   -f  --framework     Specify a custom HTML framework file.
       --brief         Print brief messages (default).
@@ -304,54 +295,57 @@ Options:
   -v  --version       Show version information.
 
 </code></pre>
-              <p>
-                If the <em>FILE</em> argument is missing, the
-                program will attempt to read a markdown document
-                from its standard input.
-              </p>
-            </article>
-            <article class="tab">
-              <a id="anchor-3" href="#anchor-3">
-              <h1>
-                Dependencies
-              </h1></a>
-              <p>
-                In order to compile this program from its
-                <em>Makefile</em> the following libraries and their
-                respective header files must be present in the
-                system.
-              </p>
-              <ul>
-                <li>
-                  <p>
-                    <a href="https://github.com/mity/md4c">md4c</a>
-                    — C Markdown parser
-                  </p>
-                </li>
-                <li>
-                  <p>
-                    <a href=
-                    "https://github.com/leethomason/tinyxml2">tinyxml2</a>
-                    — Simple XML parser made for easy integration
-                  </p>
-                </li>
-                <li>
-                  <p>
-                    <a href="https://www.html-tidy.org/">tidy</a> —
-                    A tool to tidy down HTML code to a clean style
-                  </p>
-                </li>
-              </ul>
-            </article>
-          </div><input type="checkbox" name="burger" id="burger"
-          value="value">
-          <div class="menu">
-            <div class="options">
-              <label for="burger"></label>
-              <div id="MDMA-AGENDA">
-                <a href="#anchor-1">MDMA</a><a href=
-                "#anchor-2">Synopsis</a><a href=
-                "#anchor-3">Dependencies</a>
+                <p>
+                  If the <em>FILE</em> argument is missing, the
+                  program will attempt to read a markdown document
+                  from its standard input.
+                </p>
+              </article>
+              <article class="tab">
+                <a id="anchor-3" href="#anchor-3">
+                <h1>
+                  Dependencies
+                </h1></a>
+                <p>
+                  In order to compile this program from its
+                  <em>Makefile</em> the following libraries and
+                  their respective header files must be present in
+                  the system.
+                </p>
+                <ul>
+                  <li>
+                    <p>
+                      <a href=
+                      "https://github.com/mity/md4c">md4c</a> — C
+                      Markdown parser
+                    </p>
+                  </li>
+                  <li>
+                    <p>
+                      <a href=
+                      "https://github.com/leethomason/tinyxml2">tinyxml2</a>
+                      — Simple XML parser made for easy integration
+                    </p>
+                  </li>
+                  <li>
+                    <p>
+                      <a href="https://www.html-tidy.org/">tidy</a>
+                      — A tool to tidy down HTML code to a clean
+                      style
+                    </p>
+                  </li>
+                </ul>
+              </article>
+            </div><input type="checkbox" name="burger" id="burger"
+            value="value">
+            <div class="menu">
+              <div class="options">
+                <label for="burger"></label>
+                <div id="MDMA-AGENDA">
+                  <a href="#anchor-1">MDMA</a><a href=
+                  "#anchor-2">Synopsis</a><a href=
+                  "#anchor-3">Dependencies</a>
+                </div>
               </div>
             </div>
           </div>
