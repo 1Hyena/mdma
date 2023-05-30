@@ -14,7 +14,7 @@ below screenshot.
 |  Screenshot depicting how this document renders in the Chromium web browser  |
 
 [img-demo]: screenshot.jpg
-[url-demo]: https://raw.githack.com/1Hyena/mdma/master/README.html
+[url-demo]: https://raw.githack.com/1Hyena/mdma/master/framework.html
             "Click to see this document in your web browser"
 
 To see a live demo of this document in the format of an HTML application, click
