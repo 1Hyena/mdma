@@ -98,9 +98,9 @@ int main(int argc, char **argv) {
     return fail ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
-tinyxml2::XMLElement *find_if(
-    const tinyxml2::XMLElement &root,
-    std::function<bool(const tinyxml2::XMLElement &, int)> fun
+tinyxml2::XMLNode *find_if(
+    const tinyxml2::XMLNode &root,
+    std::function<bool(const tinyxml2::XMLNode &, int)> fun
 );
 
 bool parse_markdown(
@@ -157,10 +157,11 @@ bool parse_markdown(
         return false;
     }
 
-    const tinyxml2::XMLElement *first_heading = find_if(
+    const tinyxml2::XMLNode *first_heading = find_if(
         *parent,
-        [](const tinyxml2::XMLElement &el, int depth) {
-            const char *name = el.Name();
+        [](const tinyxml2::XMLNode &node, int depth) {
+            const tinyxml2::XMLElement *el = node.ToElement();
+            const char *name = el ? el->Name() : nullptr;
 
             if (name) {
                 if (!strcasecmp("h1", name)) {
@@ -172,24 +173,32 @@ bool parse_markdown(
         }
     );
 
-    const tinyxml2::XMLElement *sibling = first_heading;
+    const tinyxml2::XMLNode *sibling = first_heading;
 
-    for (; sibling; sibling = sibling->NextSiblingElement()) {
-        const char *name = sibling->Name();
+    for (; sibling; sibling = sibling->NextSibling()) {
+        const tinyxml2::XMLElement *sibling_element = sibling->ToElement();
 
-        if (!name) {
-            continue;
+        bool new_tab = false;
+        bool new_anchor = false;
+
+        if (sibling_element) {
+            const char *name = sibling_element->Name();
+
+            if (!name) {
+                continue;
+            }
+
+            new_tab = !strcasecmp("h1", name);
+
+            new_anchor = (
+                new_tab
+                || !strcasecmp("h2", name)
+                || !strcasecmp("h3", name)
+                || !strcasecmp("h4", name)
+                || !strcasecmp("h5", name)
+                || !strcasecmp("h6", name)
+            );
         }
-
-        bool new_tab = !strcasecmp("h1", name);
-        bool new_anchor{
-            new_tab
-            || !strcasecmp("h2", name)
-            || !strcasecmp("h3", name)
-            || !strcasecmp("h4", name)
-            || !strcasecmp("h5", name)
-            || !strcasecmp("h6", name)
-        };
 
         if (new_tab) {
             tinyxml2::XMLNode *node = nullptr;
@@ -238,7 +247,7 @@ bool parse_markdown(
             raise(SIGSEGV);
         }
 
-        int id = callback(*sibling);
+        int id = callback(*sibling_element);
 
         if (id <= 0) {
             raise(SIGSEGV);
@@ -306,18 +315,19 @@ void assemble_framework_body(
 
     tinyxml2::XMLElement *parent = doc.RootElement();
 
-    tinyxml2::XMLElement *content = find_if(
+    tinyxml2::XMLNode *content_node = find_if(
         *parent,
-        [](const tinyxml2::XMLElement &el, int) {
-            const char *name = el.Name();
+        [](const tinyxml2::XMLNode &node, int) {
+            const tinyxml2::XMLElement *el = node.ToElement();
+            const char *name = el ? el->Name() : nullptr;
 
-            if (name && strcasecmp("div", name)) {
+            if (!name || strcasecmp("div", name)) {
                 return false;
             }
 
             const char *id = "";
 
-            if (el.QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
+            if (el->QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
                 return false;
             }
 
@@ -327,6 +337,10 @@ void assemble_framework_body(
 
             return false;
         }
+    );
+
+    tinyxml2::XMLElement *content = (
+        content_node ? content_node->ToElement() : nullptr
     );
 
     if (content) {
@@ -342,18 +356,19 @@ void assemble_framework_body(
         }
     }
 
-    tinyxml2::XMLElement *agenda = find_if(
+    tinyxml2::XMLNode *agenda_node = find_if(
         *parent,
-        [](const tinyxml2::XMLElement &el, int) {
-            const char *name = el.Name();
+        [](const tinyxml2::XMLNode &node, int) {
+            const tinyxml2::XMLElement *el = node.ToElement();
+            const char *name = el ? el->Name() : nullptr;
 
-            if (name && strcasecmp("div", name)) {
+            if (!name || strcasecmp("div", name)) {
                 return false;
             }
 
             const char *id = "";
 
-            if (el.QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
+            if (el->QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
                 return false;
             }
 
@@ -363,6 +378,10 @@ void assemble_framework_body(
 
             return false;
         }
+    );
+
+    tinyxml2::XMLElement *agenda = (
+        agenda_node ? agenda_node->ToElement() : nullptr
     );
 
     if (agenda) {
@@ -424,15 +443,16 @@ void assemble_framework_body(
 
     find_if(
         *parent,
-        [](const tinyxml2::XMLElement &el, int) {
-            const char *name = el.Name();
+        [](const tinyxml2::XMLNode &node, int) {
+            const tinyxml2::XMLElement *el = node.ToElement();
+            const char *name = el ? el->Name() : nullptr;
 
-            if (name && strcasecmp("td", name) && strcasecmp("th", name)) {
+            if (!name || (strcasecmp("td", name) && strcasecmp("th", name))) {
                 return false;
             }
 
             const char *align = "";
-            tinyxml2::XMLError err = el.QueryStringAttribute("align", &align);
+            tinyxml2::XMLError err = el->QueryStringAttribute("align", &align);
 
             if (err != tinyxml2::XML_SUCCESS) {
                 return false;
@@ -446,7 +466,7 @@ void assemble_framework_body(
             }
 
             tinyxml2::XMLElement *fix_el{
-                const_cast<tinyxml2::XMLElement *>(&el)
+                const_cast<tinyxml2::XMLElement *>(el)
             };
 
             fix_el->SetAttribute(
@@ -755,20 +775,20 @@ bool parse_framework(
     return true;
 }
 
-tinyxml2::XMLElement *find_if(
-    const tinyxml2::XMLElement &root,
-    std::function<bool(const tinyxml2::XMLElement &, int)> fun
+tinyxml2::XMLNode *find_if(
+    const tinyxml2::XMLNode &root,
+    std::function<bool(const tinyxml2::XMLNode &, int)> fun
 ) {
     int depth = 0;
 
-    const tinyxml2::XMLElement *parent = &root;
+    const tinyxml2::XMLNode *parent = &root;
 
     while (parent) {
         if (fun(*parent, depth)) {
-            return const_cast<tinyxml2::XMLElement *>(parent);
+            return const_cast<tinyxml2::XMLNode *>(parent);
         }
 
-        const tinyxml2::XMLElement *child = parent->FirstChildElement();
+        const tinyxml2::XMLNode *child = parent->FirstChild();
 
         if (child) {
             parent = child;
@@ -776,7 +796,7 @@ tinyxml2::XMLElement *find_if(
             continue;
         }
 
-        const tinyxml2::XMLElement *sibling = parent->NextSiblingElement();
+        const tinyxml2::XMLNode *sibling = parent->NextSibling();
 
         if (sibling) {
             parent = sibling;
@@ -784,13 +804,11 @@ tinyxml2::XMLElement *find_if(
         }
 
         do {
-            const tinyxml2::XMLNode *parent_node = parent->Parent();
-
-            parent = parent_node ? parent_node->ToElement() : nullptr;
+            parent = parent->Parent();
 
             if (!parent) break;
 
-            sibling = parent->NextSiblingElement();
+            sibling = parent->NextSibling();
 
             --depth;
         }
