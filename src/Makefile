@@ -6,8 +6,8 @@ C_FLAGS = -std=c++20 -Wall -Wextra -pedantic-errors -Wconversion -fmax-errors=5\
           -Wno-unused-parameter $(PROF)
 L_FLAGS = -lm -lstdc++ -lmd4c-html -ltidy -ltinyxml2 $(PROF)
 OBJ_DIR = obj
-DEFINES = -DMDMA_FRAMEWORK="$(shell xxd -i framework.html | xargs printf '%s' |\
-          cut -d '{' -f2- | cut -d '}' -f1)"
+DEFINES = -DMDMA_FRAMEWORK="$(shell xxd -i ../framework.html | \
+          xargs printf '%s' | cut -d '{' -f2- | cut -d '}' -f1)"
 
 SRC_FILES := $(wildcard *.cpp)
 O_FILES   := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(SRC_FILES))
