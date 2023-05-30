@@ -175,7 +175,6 @@ bool parse_markdown(
     const tinyxml2::XMLElement *sibling = first_heading;
 
     for (; sibling; sibling = sibling->NextSiblingElement()) {
-        tinyxml2::XMLElement *root = nullptr;
         const char *name = sibling->Name();
 
         if (!name) {
@@ -183,72 +182,87 @@ bool parse_markdown(
         }
 
         bool new_tab = !strcasecmp("h1", name);
+        bool new_anchor{
+            new_tab
+            || !strcasecmp("h2", name)
+            || !strcasecmp("h3", name)
+            || !strcasecmp("h4", name)
+            || !strcasecmp("h5", name)
+            || !strcasecmp("h6", name)
+        };
 
-        if (new_tab
-        ||  !strcasecmp("h2", name)
-        ||  !strcasecmp("h3", name)
-        ||  !strcasecmp("h4", name)
-        ||  !strcasecmp("h5", name)
-        ||  !strcasecmp("h6", name)) {
+        if (new_tab) {
             tinyxml2::XMLNode *node = nullptr;
             tinyxml2::XMLElement *elem = nullptr;
 
-            if (new_tab) {
-                sections.emplace_back();
+            sections.emplace_back();
 
-                node = sections.back().InsertFirstChild(
-                    sections.back().NewElement("article")
-                );
+            node = sections.back().InsertFirstChild(
+                sections.back().NewElement("article")
+            );
 
-                elem = node ? node->ToElement() : nullptr;
-
-                if (elem) {
-                    elem->SetAttribute("class", "tab");
-                }
-            }
-            else {
-                elem = sections.back().RootElement();
-            }
+            elem = node ? node->ToElement() : nullptr;
 
             if (elem) {
-                node = elem->InsertEndChild(
-                    sections.back().NewElement("a")
-                );
-
-                elem = node ? node->ToElement() : nullptr;
-
-                if (elem) {
-                    int id = callback(*sibling);
-
-                    if (id > 0) {
-                        std::string anchor_id(
-                            std::string("anchor-").append(std::to_string(id))
-                        );
-
-                        elem->SetAttribute("id", anchor_id.c_str());
-                        elem->SetAttribute(
-                            "href", std::string("#").append(anchor_id).c_str()
-                        );
-
-                        root = elem;
-                    }
-                    else raise(SIGSEGV);
-                }
-                else raise(SIGSEGV);
+                elem->SetAttribute("class", "tab");
             }
-            else raise(SIGSEGV);
         }
 
         if (sections.empty()) continue;
 
-        if (!root) {
-            root = sections.back().RootElement();
+        tinyxml2::XMLElement *root = sections.back().RootElement();
+
+        tinyxml2::XMLNode *node = (
+            new_anchor ? (
+                sibling->ShallowClone(&sections.back())
+            ) : sibling->DeepClone(&sections.back())
+        );
+
+        tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
+
+        if (!elem) {
+            raise(SIGSEGV);
         }
 
-        tinyxml2::XMLNode *node = sibling->DeepClone(&sections.back());
+        root->InsertEndChild(elem);
 
-        if (node) {
-            root->InsertEndChild(node);
+        if (!new_anchor) {
+            continue;
+        }
+
+        node = elem->InsertEndChild(sections.back().NewElement("a"));
+
+        elem = node ? node->ToElement() : nullptr;
+
+        if (!elem) {
+            raise(SIGSEGV);
+        }
+
+        int id = callback(*sibling);
+
+        if (id <= 0) {
+            raise(SIGSEGV);
+        }
+
+        std::string anchor_id(
+            std::string("anchor-").append(std::to_string(id))
+        );
+
+        elem->SetAttribute("id", anchor_id.c_str());
+        elem->SetAttribute(
+            "href", std::string("#").append(anchor_id).c_str()
+        );
+
+        const tinyxml2::XMLNode *child = sibling->FirstChild();
+
+        for (; child; child = child->NextSibling()) {
+            tinyxml2::XMLNode *n = child->DeepClone(&sections.back());
+
+            if (!n) {
+                raise(SIGSEGV);
+            }
+
+            elem->InsertEndChild(n);
         }
     }
 
