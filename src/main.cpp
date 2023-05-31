@@ -754,6 +754,29 @@ bool parse_framework(
                         break;
                     }
 
+                    if (tidyNodeGetId(node) == TidyTag_META) {
+                        TidyAttr attr = tidyAttrGetById(node, TidyAttr_NAME);
+                        const char *name = nullptr;
+                        const char *content = nullptr;
+                        const char *prefix = MDMA_CAPTION;
+
+                        if (attr
+                        && (name = tidyAttrValue(attr))
+                        && !strcasecmp("generator", name)
+                        && (attr = tidyAttrGetById(node, TidyAttr_CONTENT))
+                        && (content = tidyAttrValue(attr))
+                        && !strncasecmp(prefix, content, strlen(prefix))) {
+                            // Since we are robustly adding a generator META
+                            // tag to the HTML head we have to reject any
+                            // existing tags here to prevent them from
+                            // accumulating when feeding the program its own
+                            // output.
+
+                            break;
+
+                        }
+                    }
+
                     tidyNodeGetText(tdoc, node, &tidy_buffer);
                     framework.append(
                         (const char *) tidy_buffer.bp, tidy_buffer.size
@@ -782,7 +805,7 @@ bool parse_framework(
     tidyRelease(tdoc);
     tidyBufFree(&tidy_buffer);
 
-    std::cout << framework << "\n";
+    std::cout << framework;
 
     return true;
 }
