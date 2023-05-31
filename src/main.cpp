@@ -14,6 +14,10 @@
 #include <map>
 #include <signal.h>
 
+#define MDMA_CAPTION "MarkDown Monolith Assembler"
+#define MDMA_VERSION "1.0"
+#define MDMA_AUTHOR  "Erich Erstu"
+
 bool parse_framework(
     const std::string &path, const std::list<tinyxml2::XMLDocument> &sections,
     const std::map<int, std::pair<int, std::string>> &headings
@@ -29,7 +33,7 @@ int add_heading_and_get_parent_id(
 );
 
 int main(int argc, char **argv) {
-    OPTIONS options("MarkDown Monolith Assembler", "1.0", "Erich Erstu");
+    OPTIONS options(MDMA_CAPTION, MDMA_VERSION, MDMA_AUTHOR);
 
     bool fail{
         !options.deserialize(
@@ -705,6 +709,12 @@ bool parse_framework(
 
                     if (tidyNodeGetId(node) == TidyTag_HEAD) {
                         framework.append("<head>\n");
+
+                        framework.append(
+                            "<meta name=\"generator\" content=\""
+                        ).append(MDMA_CAPTION).append(" version ").append(
+                            MDMA_VERSION
+                        ).append("\">\n");
 
                         if (!headings.empty()) {
                             end_tags[depth].append(
