@@ -597,7 +597,9 @@ bool parse_framework(
         ).append(anchor_id).append("\"]");
 
         if (heading_counter == headings.size()) {
-            agenda_css.append(" {\n").append("    color: green;\n}\n");
+            agenda_css.append(" {\n").append(
+                "    color: var(--MDMA-AGENDA-TARGET-COLOR);\n}\n"
+            );
         }
         else {
             agenda_css.append(",\n");

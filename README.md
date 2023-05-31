@@ -1,4 +1,4 @@
-# MDMA #########################################################################
+# About ########################################################################
 
 In this context MDMA stands for "MarkDown Monolith Assembler". It is a command
 line tool for building elegant browser-based books using the Markdown markup
@@ -20,7 +20,20 @@ below screenshot.
 To see a live demo of this document in the format of an HTML application, click
 on the above screenshot and the respective page will open in your web browser.
 
-# Synopsis #####################################################################
+
+# Usage ########################################################################
+
+MDMA makes use of the standard input, output and error streams and follows the
+_garbage in, garbage out_ (GIGO) principle by design. If the program is started
+with the `-h` (short for `--help`) argument, then it will only print its usage
+synopsis and exit.
+
+In the following sections the usage synopsis is given, followed by the most
+common build instructions. Finally, libraries that need to be installed on the
+host system for successful compilation are listed.
+
+
+## Synopsis ####################################################################
 
 ```
 Usage: mdma [OPTION]... [FILE]
@@ -37,10 +50,19 @@ Options:
 If the _FILE_ argument is missing, the program will attempt to read a markdown
 document from its standard input.
 
-# Dependencies #################################################################
 
-In order to compile this program from its _Makefile_ the following libraries and
-their respective header files must be present in the system.
+## Build Instructions ##########################################################
+
+MDMA is written in C++ and should be trivial to compile on most Linux based
+systems. Just go to the _src_ directory and type _make_. If compilation fails,
+then most likely you are missing some of the required dependencies listed in the
+following section.
+
+
+## Dependencies ################################################################
+
+In order to compile this program from its _Makefile_, the following libraries
+and their respective header files must be present in the system.
 
 * [md4c](https://github.com/mity/md4c) —
   C Markdown parser
@@ -50,3 +72,8 @@ their respective header files must be present in the system.
 
 * [tidy](https://www.html-tidy.org/) —
   A tool to tidy down HTML code to a clean style
+
+
+# License ######################################################################
+
+MDMA is authored by Erich Erstu and released under the [MIT](LICENSE) license.
