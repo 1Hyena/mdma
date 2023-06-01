@@ -660,7 +660,11 @@ bool fill_framework(
     TidyDoc tdoc = tidyCreate();// TODO: assure automatic deallocation on return
 
     setup(tdoc);
-    tidyOptSetBool(tdoc, TidyIndentContent, yes);
+    tidyOptSetInt(tdoc, TidyIndentContent, yes);
+    tidyOptSetInt(tdoc, TidyIndentSpaces, 2);
+    tidyOptSetInt(tdoc, TidyVertSpace, yes);
+    tidyOptSetInt(tdoc, TidyWrapLen, 68);
+
     tidyParseString( tdoc, framework.c_str() );
     framework.clear();
 
@@ -1006,8 +1010,14 @@ int add_heading_and_get_parent_id(
 
 void setup(TidyDoc doc) {
     tidyOptSetBool(doc, TidyMark, no);
-    tidyOptSetBool(doc, TidyHideComments, yes);
     tidyOptSetBool(doc, TidyMergeSpans, no);
     tidyOptSetBool(doc, TidyDropEmptyElems, no);
     tidyOptSetBool(doc, TidyDropEmptyParas, no);
+
+    tidyOptSetBool(doc, TidyIndentAttributes, no);
+    tidyOptSetBool(doc, TidyIndentCdata, no);
+    tidyOptSetInt(doc, TidyIndentContent, no );
+    tidyOptSetInt(doc, TidyIndentSpaces, 0);
+    tidyOptSetInt(doc, TidyVertSpace, TidyAutoState);
+    tidyOptSetInt(doc, TidyWrapLen, 0);
 }

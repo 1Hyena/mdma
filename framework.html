@@ -12,138 +12,138 @@
     "width=device-width, initial-scale=1">
     <style>
     :root {
-    --MDMA-AGENDA-TARGET-COLOR: green;
-    --smallest-width: 320px;
-    --content-padding: 10vmin;
-    --content-width: max(min(100vh - var(--content-padding), 100vw), 72vw);
-    --content-height: min(
-        max(
-            100vh - var(--content-padding),
-            200vh - var(--content-padding) - 100vw
-        ), 100vh
-    );
-    --menu-width: 10rem;
-    --menu-burger-width: 2rem;
+        --MDMA-AGENDA-TARGET-COLOR: green;
+        --smallest-width: 320px;
+        --content-padding: 10vmin;
+        --content-width: max(min(100vh - var(--content-padding), 100vw), 72vw);
+        --content-height: min(
+            max(
+                100vh - var(--content-padding),
+                200vh - var(--content-padding) - 100vw
+            ), 100vh
+        );
+        --menu-width: 10rem;
+        --menu-burger-width: 2rem;
     }
 
     *, ::before, ::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
     }
 
     html, body, .container {
-    height:100%;
-    width:100%;
-    overflow: hidden;
+        height:100%;
+        width:100%;
+        overflow: hidden;
     }
 
     .container {
-    background: linear-gradient(to right, silver, gray);
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center center;
-    text-align: right;
-    white-space: nowrap;
-    display: grid;
-    place-items: center end;
+        background: linear-gradient(to right, silver, gray);
+        background-repeat: no-repeat;
+        background-size: cover;
+        background-position: center center;
+        text-align: right;
+        white-space: nowrap;
+        display: grid;
+        place-items: center end;
     }
 
     .content {
-    position: relative;
-    display: inline-block;
-    overflow: hidden;
-    width: var(--content-width);
-    height: var(--content-height);
-    vertical-align: middle;
+        position: relative;
+        display: inline-block;
+        overflow: hidden;
+        width: var(--content-width);
+        height: var(--content-height);
+        vertical-align: middle;
     }
 
     #width-guard {
-    position: absolute;
-    display: inline-block;
-    top: 0;
-    left: 0;
-    width: calc(
-        (
-            var(--smallest-width) + var(--menu-width) - var(--content-width)
-        ) * 10000
-    );
-    min-width: 0px;
-    max-width: 1px;
-    container-type: inline-size;
+        position: absolute;
+        display: inline-block;
+        top: 0;
+        left: 0;
+        width: calc(
+            (
+                var(--smallest-width) + var(--menu-width) - var(--content-width)
+            ) * 10000
+        );
+        min-width: 0px;
+        max-width: 1px;
+        container-type: inline-size;
     }
 
     #width-guard > div {
-    position: absolute;
-    display: inline-block;
-    top: 0;
-    left: 0;
-    width: var(--content-width);
-    height: var(--content-height);
+        position: absolute;
+        display: inline-block;
+        top: 0;
+        left: 0;
+        width: var(--content-width);
+        height: var(--content-height);
     }
 
     #MDMA-CONTENT {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    height: 100%;
-    text-align: left;
-    scroll-behavior: smooth;
-    overflow-y: scroll;
-    overflow-x: hidden;
-    z-index: 0;
-    background: rgba(255, 255, 255, 0.5);
-    border-top-left-radius: 1rem;
-    border-bottom-left-radius: 1rem;
-    border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
-    border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        text-align: left;
+        scroll-behavior: smooth;
+        overflow-y: scroll;
+        overflow-x: hidden;
+        z-index: 0;
+        background: rgba(255, 255, 255, 0.5);
+        border-top-left-radius: 1rem;
+        border-bottom-left-radius: 1rem;
+        border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
+        border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
     }
 
     #burger {
-    position: absolute;
-    top: 0;
-    left: 0;
-    display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: none;
     }
 
     .menu {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: clamp(
-        min(var(--menu-burger-width), var(--menu-width)),
-        100%,
-        min(var(--menu-width), 100%)
-    );
-    z-index: 1;
-    pointer-events: none;
-    overflow: visible;
-    transition: width 0.1s linear;
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: clamp(
+            min(var(--menu-burger-width), var(--menu-width)),
+            100%,
+            min(var(--menu-width), 100%)
+        );
+        z-index: 1;
+        pointer-events: none;
+        overflow: visible;
+        transition: width 0.1s linear;
     }
 
     .options {
-    position: absolute;
-    top: 0.125rem;
-    right: 0;
-    width: 100%;
-    background-color: orange;
-    text-align: left;
-    pointer-events: auto;
-    overflow-y: auto;
-    overflow-x: hidden;
-    max-height: calc(100% - 0.25rem);
-    background: rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(8px);
-    border-top-left-radius: 1rem;
-    border-bottom-left-radius: 1rem;
-    border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
-    border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
-    padding: 0.5rem;
-    padding-right: 0;
+        position: absolute;
+        top: 0.125rem;
+        right: 0;
+        width: 100%;
+        background-color: orange;
+        text-align: left;
+        pointer-events: auto;
+        overflow-y: auto;
+        overflow-x: hidden;
+        max-height: calc(100% - 0.25rem);
+        background: rgba(255, 255, 255, 0.4);
+        backdrop-filter: blur(8px);
+        border-top-left-radius: 1rem;
+        border-bottom-left-radius: 1rem;
+        border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
+        border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
+        padding: 0.5rem;
+        padding-right: 0;
     }
 
     #MDMA-AGENDA a {
@@ -155,67 +155,67 @@
     }
 
     .tab {
-    position: relative;
-    display: block;
-    width: max(var(--content-width) - var(--menu-width), 0%);
-    overflow: visible;
-    padding: 1rem;
-    padding-right: var(--menu-burger-width);
-    white-space: normal;
+        position: relative;
+        display: block;
+        width: max(var(--content-width) - var(--menu-width), 0%);
+        overflow: visible;
+        padding: 1rem;
+        padding-right: var(--menu-burger-width);
+        white-space: normal;
     }
 
     .tab img {
-    max-width: 100%;
-    max-height: 100%;
+        max-width: 100%;
+        max-height: 100%;
     }
 
     .tab:not(:has(a:target)) {
-    display: none;
+        display: none;
     }
 
     #MDMA-CONTENT:not(:has(a:target)) > :first-child {
-    display: block;
+        display: block;
     }
 
     .menu > .options a + div {
-    max-height: 100vh;
-    transition: max-height 0.3s ease-in;
-    overflow: hidden;
+        max-height: 100vh;
+        transition: max-height 0.3s ease-in;
+        overflow: hidden;
     }
 
     label[for="burger"] {
-    display: block;
-    text-align: right;
-    pointer-events: none;
-    padding-right: 0.5rem;
+        display: block;
+        text-align: right;
+        pointer-events: none;
+        padding-right: 0.5rem;
     }
 
     label[for="burger"]::after {
-    content: "✖";
-    opacity: 0;
-    transition: opacity 0.1s linear;
+        content: "✖";
+        opacity: 0;
+        transition: opacity 0.1s linear;
     }
 
     @container (min-width: 1px) {
-    label[for="burger"] {
-        pointer-events: all;
-    }
+        label[for="burger"] {
+            pointer-events: all;
+        }
 
-    label[for="burger"]::after {
-        opacity: 1;
-    }
+        label[for="burger"]::after {
+            opacity: 1;
+        }
 
-    :not(#burger:checked) + .menu > .options > label[for="burger"]::after {
-        content: "☰";
-    }
+        :not(#burger:checked) + .menu > .options > label[for="burger"]::after {
+            content: "☰";
+        }
 
-    :not(#burger:checked) + .menu{
-        width: min(var(--menu-burger-width), var(--menu-width));
-    }
+        :not(#burger:checked) + .menu{
+            width: min(var(--menu-burger-width), var(--menu-width));
+        }
 
-    .tab {
-        width: 100%;
-    }
+        .tab {
+            width: 100%;
+        }
     }
     </style>
     <style class="MDMA-AUTOGENERATED">
@@ -248,12 +248,14 @@
                 <h1>
                   <a id="anchor-1" href="#anchor-1">About</a>
                 </h1>
+
                 <p>
                   In this context MDMA stands for "MarkDown
                   Monolith Assembler". It is a command line tool
                   for building elegant browser-based books using
                   the Markdown markup language.
                 </p>
+
                 <p>
                   When given a markdown document as an input, this
                   program produces a monolithic JavaScript-free
@@ -262,6 +264,7 @@
                   would be generated that renders as shown in the
                   below screenshot.
                 </p>
+
                 <table>
                   <thead>
                     <tr>
@@ -275,6 +278,7 @@
                       </th>
                     </tr>
                   </thead>
+
                   <tbody>
                     <tr>
                       <td style="text-align: center;">
@@ -284,6 +288,7 @@
                     </tr>
                   </tbody>
                 </table>
+
                 <p>
                   To see a live demo of this document in the format
                   of an HTML application, click on the above
@@ -291,10 +296,12 @@
                   your web browser.
                 </p>
               </article>
+
               <article class="tab">
                 <h1>
                   <a id="anchor-2" href="#anchor-2">Usage</a>
                 </h1>
+
                 <p>
                   MDMA makes use of the standard input, output and
                   error streams and follows the <em>garbage in,
@@ -303,6 +310,7 @@
                   (short for <code>--help</code>) argument, then it
                   will only print its usage synopsis and exit.
                 </p>
+
                 <p>
                   In the following sections the usage synopsis is
                   given, followed by the most common build
@@ -310,9 +318,11 @@
                   installed on the host system for successful
                   compilation are listed.
                 </p>
+
                 <h2>
                   <a id="anchor-3" href="#anchor-3">Synopsis</a>
                 </h2>
+
                 <pre><code>Usage: mdma [OPTION]... [FILE]
 Options:
   -f  --framework     Specify a custom HTML framework file.
@@ -328,10 +338,12 @@ Options:
                   program will attempt to read a markdown document
                   from its standard input.
                 </p>
+
                 <h2>
                   <a id="anchor-4" href="#anchor-4">Build
                   Instructions</a>
                 </h2>
+
                 <p>
                   MDMA is written in C++ and should be trivial to
                   compile on most Linux based systems. Just go to
@@ -340,16 +352,19 @@ Options:
                   likely you are missing some of the required
                   dependencies listed in the following section.
                 </p>
+
                 <h2>
                   <a id="anchor-5" href=
                   "#anchor-5">Dependencies</a>
                 </h2>
+
                 <p>
                   In order to compile this program from its
                   <em>Makefile</em>, the following libraries and
                   their respective header files must be present in
                   the system.
                 </p>
+
                 <ul>
                   <li>
                     <p>
@@ -358,6 +373,7 @@ Options:
                       Markdown parser
                     </p>
                   </li>
+
                   <li>
                     <p>
                       <a href=
@@ -365,6 +381,7 @@ Options:
                       — Simple XML parser made for easy integration
                     </p>
                   </li>
+
                   <li>
                     <p>
                       <a href="https://www.html-tidy.org/">tidy</a>
@@ -374,17 +391,20 @@ Options:
                   </li>
                 </ul>
               </article>
+
               <article class="tab">
                 <h1>
                   <a id="anchor-6" href="#anchor-6">License</a>
                 </h1>
+
                 <p>
                   MDMA is authored by Erich Erstu and released
                   under the <a href="LICENSE">MIT</a> license.
                 </p>
               </article>
-            </div><input type="checkbox" name="burger" id="burger"
-            value="value">
+            </div>
+            <input type="checkbox" name="burger" id="burger" value=
+            "value">
             <div class="menu">
               <div class="options">
                 <label for="burger"></label>
@@ -395,7 +415,8 @@ Options:
                     <a href="#anchor-3">Synopsis</a><a href=
                     "#anchor-4">Build Instructions</a><a href=
                     "#anchor-5">Dependencies</a>
-                  </div><a href="#anchor-6">License</a>
+                  </div>
+                  <a href="#anchor-6">License</a>
                 </div>
               </div>
             </div>
