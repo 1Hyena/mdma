@@ -45,12 +45,8 @@
     background-position: center center;
     text-align: right;
     white-space: nowrap;
-    }
-
-    .container > span:first-child {
-    height: 100%;
-    display: inline-block;
-    vertical-align: middle;
+    display: grid;
+    place-items: center end;
     }
 
     .content {
@@ -244,7 +240,6 @@
   </head>
   <body>
     <div class="container">
-      <span></span>
       <div class="content">
         <div id="width-guard">
           <div>
