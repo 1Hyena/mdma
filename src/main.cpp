@@ -334,6 +334,7 @@ void assemble_framework_body(
         TidyBuffer tidy_buffer{};
         TidyDoc tdoc_xml = tidyCreate();
 
+        tidyOptSetBool(tdoc_xml, TidyMark, no);
         tidyOptSetBool(tdoc_xml, TidyHideComments, yes);
         tidyOptSetBool(tdoc_xml, TidyMergeSpans, no);
         tidyOptSetBool(tdoc_xml, TidyDropEmptyElems, no);
@@ -531,6 +532,7 @@ void assemble_framework_body(
         TidyBuffer tidy_buffer{};
         TidyDoc tdoc = tidyCreate();
 
+        tidyOptSetBool(tdoc, TidyMark, no);
         tidyOptSetBool(tdoc, TidyHideComments, yes);
         tidyOptSetBool(tdoc, TidyMergeSpans, no);
         tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
@@ -582,6 +584,7 @@ bool parse_framework(
     TidyBuffer tidy_buffer{};   // TODO: assure automatic deallocation on return
     TidyDoc tdoc = tidyCreate();// TODO: assure automatic deallocation on return
 
+    tidyOptSetBool(tdoc, TidyMark, no);
     tidyOptSetBool(tdoc, TidyHideComments, yes);
     tidyOptSetBool(tdoc, TidyMergeSpans, no);
     tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
@@ -666,6 +669,7 @@ bool fill_framework(
     TidyBuffer tidy_buffer{};   // TODO: assure automatic deallocation on return
     TidyDoc tdoc = tidyCreate();// TODO: assure automatic deallocation on return
 
+    tidyOptSetBool(tdoc, TidyMark, no);
     tidyOptSetBool(tdoc, TidyHideComments, yes);
     tidyOptSetBool(tdoc, TidyMergeSpans, no);
     tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
