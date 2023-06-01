@@ -39,6 +39,8 @@ int add_heading_and_get_parent_id(
     int id, int level, std::map<int, int> &level_to_id
 );
 
+void setup(TidyDoc);
+
 int main(int argc, char **argv) {
     OPTIONS options(MDMA_CAPTION, MDMA_VERSION, MDMA_AUTHOR);
 
@@ -334,11 +336,7 @@ void assemble_framework_body(
         TidyBuffer tidy_buffer{};
         TidyDoc tdoc_xml = tidyCreate();
 
-        tidyOptSetBool(tdoc_xml, TidyMark, no);
-        tidyOptSetBool(tdoc_xml, TidyHideComments, yes);
-        tidyOptSetBool(tdoc_xml, TidyMergeSpans, no);
-        tidyOptSetBool(tdoc_xml, TidyDropEmptyElems, no);
-        tidyOptSetBool(tdoc_xml, TidyDropEmptyParas, no);
+        setup(tdoc_xml);
         tidyOptSetBool(tdoc_xml, TidyXmlOut, yes);
         tidyParseString(tdoc_xml, html5.c_str());
 
@@ -532,11 +530,7 @@ void assemble_framework_body(
         TidyBuffer tidy_buffer{};
         TidyDoc tdoc = tidyCreate();
 
-        tidyOptSetBool(tdoc, TidyMark, no);
-        tidyOptSetBool(tdoc, TidyHideComments, yes);
-        tidyOptSetBool(tdoc, TidyMergeSpans, no);
-        tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
-        tidyOptSetBool(tdoc, TidyDropEmptyParas, no);
+        setup(tdoc);
         tidyParseString( tdoc, html5.c_str() );
 
         TidyNode body = tidyGetBody(tdoc);
@@ -584,11 +578,7 @@ bool parse_framework(
     TidyBuffer tidy_buffer{};   // TODO: assure automatic deallocation on return
     TidyDoc tdoc = tidyCreate();// TODO: assure automatic deallocation on return
 
-    tidyOptSetBool(tdoc, TidyMark, no);
-    tidyOptSetBool(tdoc, TidyHideComments, yes);
-    tidyOptSetBool(tdoc, TidyMergeSpans, no);
-    tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
-    tidyOptSetBool(tdoc, TidyDropEmptyParas, no);
+    setup(tdoc);
     tidyOptSetBool(tdoc, TidyIndentContent, yes);
     tidyParseString(tdoc, framework.c_str());
 
@@ -669,11 +659,7 @@ bool fill_framework(
     TidyBuffer tidy_buffer{};   // TODO: assure automatic deallocation on return
     TidyDoc tdoc = tidyCreate();// TODO: assure automatic deallocation on return
 
-    tidyOptSetBool(tdoc, TidyMark, no);
-    tidyOptSetBool(tdoc, TidyHideComments, yes);
-    tidyOptSetBool(tdoc, TidyMergeSpans, no);
-    tidyOptSetBool(tdoc, TidyDropEmptyElems, no);
-    tidyOptSetBool(tdoc, TidyDropEmptyParas, no);
+    setup(tdoc);
     tidyOptSetBool(tdoc, TidyIndentContent, yes);
     tidyParseString( tdoc, framework.c_str() );
     framework.clear();
@@ -1016,4 +1002,12 @@ int add_heading_and_get_parent_id(
     level_to_id[level] = id;
 
     return last_id;
+}
+
+void setup(TidyDoc doc) {
+    tidyOptSetBool(doc, TidyMark, no);
+    tidyOptSetBool(doc, TidyHideComments, yes);
+    tidyOptSetBool(doc, TidyMergeSpans, no);
+    tidyOptSetBool(doc, TidyDropEmptyElems, no);
+    tidyOptSetBool(doc, TidyDropEmptyParas, no);
 }
