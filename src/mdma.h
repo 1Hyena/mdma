@@ -49,7 +49,7 @@ class MDMA {
     );
 
     bool parse_markdown(
-        std::string &markdown, std::list<tinyxml2::XMLDocument> &sections,
+        const char *str, size_t len, std::list<tinyxml2::XMLDocument> &sections,
         std::function<int(const tinyxml2::XMLElement &heading)> callback
     );
 
@@ -131,6 +131,7 @@ void MDMA::bug(const char *file, int line) const {
 
 void MDMA::die(const char *file, int line) const {
     bug(file, line);
+    fflush(nullptr);
     raise(SIGSEGV);
 }
 
@@ -169,11 +170,9 @@ bool MDMA::assemble(
     {
         std::map<int, int> level_to_id;
 
-        std::string markdown_buffer(md, md_len);
-
         fail = (
             !parse_markdown(
-                markdown_buffer, sections,
+                md, md_len, sections,
                 [&](const tinyxml2::XMLElement &heading) {
                     const char *title = heading.GetText();
                     const char *name = heading.Name();
@@ -302,13 +301,13 @@ bool MDMA::parse_framework(
 }
 
 bool MDMA::parse_markdown(
-    std::string &markdown, std::list<tinyxml2::XMLDocument> &sections,
+    const char *md, size_t md_len, std::list<tinyxml2::XMLDocument> &sections,
     std::function<int(const tinyxml2::XMLElement &heading)> callback
 ) {
     std::string xhtml;
 
     bool fail = md_html(
-        markdown.c_str(), MD_SIZE(markdown.size()),
+        md, MD_SIZE(md_len),
         [](const MD_CHAR *str, MD_SIZE len, void *userdata) {
             std::string *dest = static_cast<std::string *>(userdata);
             dest->append(str, len);
