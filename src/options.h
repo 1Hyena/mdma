@@ -13,10 +13,11 @@ class OPTIONS {
     static constexpr const char *usage_format{
         "Usage: %s [OPTION]... [FILE]\n"
         "Options:\n"
-        "  -f  --framework     Use a custom HTML framework file.\n"
         "      --brief         Print brief messages (default).\n"
         "      --debug         Print debugging messages.\n"
+        "  -f  --framework     Use a custom HTML framework file.\n"
         "  -h  --help          Display this usage information.\n"
+        "      --minify        Disable HTML indentation and wrapping.\n"
         "      --verbose       Print verbose messages.\n"
         "  -v  --version       Show version information.\n"
     };
@@ -24,6 +25,7 @@ class OPTIONS {
     struct flagset_type {
         int verbose;
         int debug;
+        int minify;
         int exit;
     };
 
@@ -32,6 +34,7 @@ class OPTIONS {
             {
                 .verbose = 0,
                 .debug   = 0,
+                .minify  = 0,
                 .exit    = 0
             }
         )
@@ -62,6 +65,7 @@ class OPTIONS {
             { "debug",       no_argument,       &flags.debug,   1 },
             { "brief",       no_argument,       &flags.verbose, 0 },
             { "verbose",     no_argument,       &flags.verbose, 1 },
+            { "minify",      no_argument,       &flags.minify,  1 },
             // These options don't set a flag. We distinguish them by indices:
             { "framework",   required_argument, 0,             'f'},
             { "help",        no_argument,       0,             'h'},
