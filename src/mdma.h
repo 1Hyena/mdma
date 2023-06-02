@@ -39,8 +39,9 @@ class MDMA {
     bool assemble(const char *htm, size_t htm_sz, const char *md, size_t md_sz);
 
     private:
-    void bug(const char * =__builtin_FILE(), int =__builtin_LINE());
+    void bug(const char * =__builtin_FILE(), int =__builtin_LINE()) const;
     void log(const char *fmt, ...) const __attribute__((format(printf, 2, 3)));
+    void die(const char * =__builtin_FILE(), int =__builtin_LINE()) const;
 
     bool parse_framework(
         std::string &framework,
@@ -124,8 +125,13 @@ void MDMA::log(const char *fmt, ...) const {
     if (bufptr && bufptr != stackbuf) delete [] bufptr;
 }
 
-void MDMA::bug(const char *file, int line) {
+void MDMA::bug(const char *file, int line) const {
     log("Forbidden condition met in %s on line %d.", file, line);
+}
+
+void MDMA::die(const char *file, int line) const {
+    bug(file, line);
+    raise(SIGSEGV);
 }
 
 bool MDMA::assemble(
@@ -397,7 +403,7 @@ bool MDMA::parse_markdown(
         tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
 
         if (!elem) {
-            raise(SIGSEGV);
+            die();
         }
 
         root->InsertEndChild(elem);
@@ -411,13 +417,13 @@ bool MDMA::parse_markdown(
         elem = node ? node->ToElement() : nullptr;
 
         if (!elem) {
-            raise(SIGSEGV);
+            die();
         }
 
         int id = callback(*sibling_element);
 
         if (id <= 0) {
-            raise(SIGSEGV);
+            die();
         }
 
         std::string anchor_id(
@@ -435,7 +441,7 @@ bool MDMA::parse_markdown(
             tinyxml2::XMLNode *n = child->DeepClone(&sections.back());
 
             if (!n) {
-                raise(SIGSEGV);
+                die();
             }
 
             elem->InsertEndChild(n);
@@ -957,7 +963,7 @@ void MDMA::assemble_framework_body(
                     groups.emplace(parent_id, elem);
                     container = elem;
                 }
-                else raise(SIGSEGV);
+                else die();
             }
 
             tinyxml2::XMLNode *node = container->InsertEndChild(
@@ -976,7 +982,7 @@ void MDMA::assemble_framework_body(
 
                 elem->InsertNewText(p.second.second.c_str());
             }
-            else raise(SIGSEGV);
+            else die();
         }
     }
 
