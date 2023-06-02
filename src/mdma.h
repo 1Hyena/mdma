@@ -25,7 +25,6 @@ class MDMA {
         }
     )
     , assembly_buffer("")
-    , print_callback(nullptr)
     , log_callback(nullptr) {}
 
     ~MDMA() {}
@@ -34,9 +33,11 @@ class MDMA {
         bool minify:1;
     } cfg;
 
-    void set_printer(const std::function<void(const char *)>& print_callback);
-    void set_logger (const std::function<void(const char *)>& log_callback);
-    bool assemble(const char *htm, size_t htm_sz, const char *md, size_t md_sz);
+    void set_logger(const std::function<void(const char *)>& log_callback);
+
+    const std::string *assemble(
+        const char *htm, size_t htm_sz, const char *md, size_t md_sz
+    );
 
     private:
     void bug(const char * =__builtin_FILE(), int =__builtin_LINE()) const;
@@ -81,13 +82,8 @@ class MDMA {
     ) const;
 
     std::string assembly_buffer;
-    std::function<void(const char *text)> print_callback;
     std::function<void(const char *text)> log_callback;
 };
-
-void MDMA::set_printer(const std::function<void(const char *)>& print_cb) {
-    print_callback = print_cb;
-}
 
 void MDMA::set_logger (const std::function<void(const char *)>& log_cb) {
     log_callback = log_cb;
@@ -135,12 +131,12 @@ void MDMA::die(const char *file, int line) const {
     raise(SIGSEGV);
 }
 
-bool MDMA::assemble(
+const std::string *MDMA::assemble(
     const char *html, size_t html_len, const char *md, size_t md_len
 ) {
     if (!html || !md) {
         bug();
-        return false;
+        return nullptr;
     }
 
     assembly_buffer.assign(html, html_len);
@@ -161,7 +157,7 @@ bool MDMA::assemble(
         )
     );
 
-    if (fail) return false;
+    if (fail) return nullptr;
 
     int next_id = 1;
     std::list<tinyxml2::XMLDocument> sections;
@@ -206,17 +202,13 @@ bool MDMA::assemble(
         );
     }
 
-    if (fail) return false;
+    if (fail) return nullptr;
 
     if (!fill_framework(assembly_buffer, sections, headings)) {
-        return false;
+        return nullptr;
     }
 
-    if (print_callback) {
-        print_callback(assembly_buffer.c_str());
-    }
-
-    return true;
+    return &assembly_buffer;
 }
 
 bool MDMA::parse_framework(
@@ -467,7 +459,7 @@ bool MDMA::fill_framework(
         tidyOptSetInt(tdoc, TidyWrapLen, 68);
     }
 
-    tidyParseString( tdoc, framework.c_str() );
+    tidyParseString(tdoc, framework.c_str());
     framework.clear();
 
     std::string agenda_css;

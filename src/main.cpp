@@ -40,12 +40,17 @@ int main(int argc, char **argv) {
     MDMA mdma;
     mdma.cfg.minify = options.flags.minify;
 
-    mdma.set_printer(print);
     mdma.set_logger(log);
 
-    if (!mdma.assemble(html.data(), html.size(), md.data(), md.size())) {
+    const std::string *output{
+        mdma.assemble(html.data(), html.size(), md.data(), md.size())
+    };
+
+    if (!output) {
         return EXIT_FAILURE;
     }
+
+    print(output->c_str());
 
     return EXIT_SUCCESS;
 }
