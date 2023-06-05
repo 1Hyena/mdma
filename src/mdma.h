@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 #ifndef MDMA_H_02_06_2023
 #define MDMA_H_02_06_2023
+
+#include "slugify.hpp"
+////////////////////////////////////////////////////////////////////////////////
 #include <cstdlib>
 #include <functional>
 #include <string>
@@ -53,9 +56,9 @@ class MDMA {
     bool parse_markdown(const char *str, size_t len);
     bool fill_framework(TidyDoc framework);
 
-    int add_heading_and_get_parent_id(
-        int id, int level, std::map<int, int> &level_to_id
-    ) const;
+    void add_heading(
+        int id, int level, const char *title, std::map<int, int> &level_to_id
+    );
 
     void setup(TidyDoc) const;
 
@@ -320,15 +323,7 @@ bool MDMA::parse_markdown(const char *md, size_t md_len) {
 
             id = next_id++;
 
-            headings.emplace(
-                id,
-                std::make_pair(
-                    add_heading_and_get_parent_id(
-                        id, level, level_to_id
-                    ),
-                    std::string(title)
-                )
-            );
+            add_heading(id, level, title, level_to_id);
         }
 
         if (id <= 0) {
@@ -604,10 +599,10 @@ bool MDMA::fill_framework(TidyDoc framework) {
     return true;
 }
 
-int MDMA::add_heading_and_get_parent_id(
-    int id, int level, std::map<int, int> &level_to_id
-) const {
-    int last_id = 0;
+void MDMA::add_heading(
+    int id, int level, const char *title, std::map<int, int> &level_to_id
+) {
+    int parent_id = 0;
 
     while (!level_to_id.empty()) {
         int last_level = std::prev(level_to_id.end())->first;
@@ -617,15 +612,20 @@ int MDMA::add_heading_and_get_parent_id(
             continue;
         }
 
-        last_id = level_to_id.at(last_level);
+        parent_id = level_to_id.at(last_level);
         break;
     }
 
     level_to_id[level] = id;
 
-    return last_id;
-}
+    /*
+    std::string slug(slugify(title));
 
+    log("[%s] ---> [%s]", title, slug.c_str());
+    */
+
+    headings.emplace(id, std::make_pair(parent_id, std::string(title)));
+}
 
 void MDMA::setup(TidyDoc doc) const {
     tidyOptSetBool(doc, TidyMark, no);
