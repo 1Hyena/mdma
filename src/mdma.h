@@ -25,9 +25,14 @@ class MDMA {
         }
     )
     , assembly_buffer("")
-    , log_callback(nullptr) {}
+    , htmltidy_buffer{}
+    , log_callback(nullptr) {
+        tidyBufInit(&htmltidy_buffer);
+    }
 
-    ~MDMA() {}
+    ~MDMA() {
+        tidyBufFree(&htmltidy_buffer);
+    }
 
     struct cfg_type {
         bool minify:1;
@@ -44,20 +49,9 @@ class MDMA {
     void log(const char *fmt, ...) const __attribute__((format(printf, 2, 3)));
     void die(const char * =__builtin_FILE(), int =__builtin_LINE()) const;
 
-    bool prune_framework(
-        TidyDoc framework, std::function<void(const TidyNode &node)> callback
-    );
-
-    bool parse_markdown(
-        const char *str, size_t len, std::list<tinyxml2::XMLDocument> &sections,
-        std::function<int(const tinyxml2::XMLElement &heading)> callback
-    );
-
-    bool fill_framework(
-        const TidyDoc framework,
-        const std::list<tinyxml2::XMLDocument> &sections,
-        const std::map<int, std::pair<int, std::string>> &headings
-    );
+    bool prune_framework(TidyDoc framework);
+    bool parse_markdown(const char *str, size_t len);
+    bool fill_framework(TidyDoc framework);
 
     int add_heading_and_get_parent_id(
         int id, int level, std::map<int, int> &level_to_id
@@ -74,14 +68,14 @@ class MDMA {
         std::function<bool(const tinyxml2::XMLNode &, int)> fun
     ) const;
 
-    void assemble_framework_body(
-        std::string &body_html,
-        const std::list<tinyxml2::XMLDocument> &sections,
-        const std::map<int, std::pair<int, std::string>> &headings
-    ) const;
+    void assemble_framework_body(std::string &body_html);
 
     std::string assembly_buffer;
+    TidyBuffer  htmltidy_buffer;
     std::function<void(const char *text)> log_callback;
+    std::map<std::string, int> identifiers;
+    std::list<tinyxml2::XMLDocument> sections;
+    std::map<int, std::pair<int, std::string>> headings;
 };
 
 void MDMA::set_logger (const std::function<void(const char *)>& log_cb) {
@@ -133,112 +127,38 @@ void MDMA::die(const char *file, int line) const {
 const std::string *MDMA::assemble(
     const char *html, size_t html_len, const char *md, size_t md_len
 ) {
+    const std::string *result = nullptr;
+
     if (!html || !md) {
         bug();
-        return nullptr;
+        return result;
     }
 
     assembly_buffer.assign(html, html_len);
+    identifiers.clear();
+    sections.clear();
 
-    TidyDoc tdoc = tidyCreate();// TODO: assure automatic deallocation on return
-    setup(tdoc);
-    tidyParseString(tdoc, assembly_buffer.c_str());
-
-    std::map<std::string, int> identifiers;
-
-    bool fail = (
-        !prune_framework(
-            tdoc,
-            [&identifiers](const TidyNode &node) {
-                TidyAttr attr = tidyAttrGetById(node, TidyAttr_ID);
-                const char *id = nullptr;
-
-                if (attr && (id = tidyAttrValue(attr))) {
-                    identifiers.emplace(id, 0);
-                }
-            }
-        )
-    );
-
-    const std::string *result = nullptr;
-
-    if (!fail) {
-        int next_id = 1;
-        std::list<tinyxml2::XMLDocument> sections;
-        std::map<int, std::pair<int, std::string>> headings;
+    {
+        TidyDoc tdoc = tidyCreate();
 
         {
-            std::map<int, int> level_to_id;
+            setup(tdoc);
+            tidyParseString(tdoc, assembly_buffer.c_str());
 
-            fail = (
-                !parse_markdown(
-                    md, md_len, sections,
-                    [&](const tinyxml2::XMLElement &heading) {
-                        const char *title = heading.GetText();
-                        const char *name = heading.Name();
-
-                        if (!title || !name) return 0;
-
-                        int level = (
-                            !strcasecmp("h1", name) ? 1 :
-                            !strcasecmp("h2", name) ? 2 :
-                            !strcasecmp("h3", name) ? 3 :
-                            !strcasecmp("h4", name) ? 4 :
-                            !strcasecmp("h5", name) ? 5 :
-                            !strcasecmp("h6", name) ? 6 : 7
-                        );
-
-                        int id = next_id++;
-
-                        headings.emplace(
-                            id,
-                            std::make_pair(
-                                add_heading_and_get_parent_id(
-                                    id, level, level_to_id
-                                ),
-                                std::string(title)
-                            )
-                        );
-
-                        return id;
-                    }
-                )
-            );
-        }
-
-        if (!fail) {
-            if (fill_framework(tdoc, sections, headings)) {
-                TidyBuffer tidy_buffer{};
-
-                if (!cfg.minify) {
-                    tidyOptSetInt(tdoc, TidyIndentContent, yes);
-                    tidyOptSetInt(tdoc, TidyIndentSpaces, 2);
-                    tidyOptSetInt(tdoc, TidyVertSpace, yes);
-                    tidyOptSetInt(tdoc, TidyWrapLen, 68);
-                }
-
-                tidyParseString(tdoc, assembly_buffer.c_str());
-                tidyCleanAndRepair(tdoc);
-                tidySaveBuffer(tdoc, &tidy_buffer);
-
-                assembly_buffer.assign(
-                    (const char *) tidy_buffer.bp, tidy_buffer.size
-                );
+            if (prune_framework(tdoc)
+            &&  parse_markdown(md, md_len)
+            &&  fill_framework(tdoc)) {
                 result = &assembly_buffer;
-
-                tidyBufFree(&tidy_buffer);
             }
         }
-    }
 
-    tidyRelease(tdoc);
+        tidyRelease(tdoc);
+    }
 
     return result;
 }
 
-bool MDMA::prune_framework(
-    TidyDoc framework, std::function<void(const TidyNode &node)> callback
-) {
+bool MDMA::prune_framework(TidyDoc framework) {
     do {
         TidyNode found = find_if(
             tidyGetBody(framework),
@@ -293,7 +213,13 @@ bool MDMA::prune_framework(
     find_if(
         tidyGetRoot(framework),
         [&](const TidyNode &node, int) {
-            callback(node);
+            TidyAttr attr = tidyAttrGetById(node, TidyAttr_ID);
+            const char *id = nullptr;
+
+            if (attr && (id = tidyAttrValue(attr))) {
+                this->identifiers.emplace(id, 0);
+            }
+
             return false;
         }
     );
@@ -301,10 +227,7 @@ bool MDMA::prune_framework(
     return true;
 }
 
-bool MDMA::parse_markdown(
-    const char *md, size_t md_len, std::list<tinyxml2::XMLDocument> &sections,
-    std::function<int(const tinyxml2::XMLElement &heading)> callback
-) {
+bool MDMA::parse_markdown(const char *md, size_t md_len) {
     std::string xhtml;
 
     bool fail = md_html(
@@ -347,6 +270,10 @@ bool MDMA::parse_markdown(
     );
 
     const tinyxml2::XMLNode *sibling = first_heading;
+    int next_id = 1;
+    std::map<int, int> level_to_id;
+
+    headings.clear();
 
     for (; sibling; sibling = sibling->NextSibling()) {
         const tinyxml2::XMLElement *sibling_element = sibling->ToElement();
@@ -420,7 +347,35 @@ bool MDMA::parse_markdown(
             die();
         }
 
-        int id = callback(*sibling_element);
+        int id = 0;
+
+        {
+            const char *title = sibling_element->GetText();
+            const char *name = sibling_element->Name();
+
+            if (!title || !name) return 0;
+
+            int level = (
+                !strcasecmp("h1", name) ? 1 :
+                !strcasecmp("h2", name) ? 2 :
+                !strcasecmp("h3", name) ? 3 :
+                !strcasecmp("h4", name) ? 4 :
+                !strcasecmp("h5", name) ? 5 :
+                !strcasecmp("h6", name) ? 6 : 7
+            );
+
+            id = next_id++;
+
+            headings.emplace(
+                id,
+                std::make_pair(
+                    add_heading_and_get_parent_id(
+                        id, level, level_to_id
+                    ),
+                    std::string(title)
+                )
+            );
+        }
 
         if (id <= 0) {
             die();
@@ -452,12 +407,7 @@ bool MDMA::parse_markdown(
 }
 
 
-bool MDMA::fill_framework(
-    const TidyDoc framework, const std::list<tinyxml2::XMLDocument> &sections,
-    const std::map<int, std::pair<int, std::string>> &headings
-) {
-    TidyBuffer tidy_buffer{};   // TODO: assure automatic deallocation on return
-
+bool MDMA::fill_framework(TidyDoc framework) {
     assembly_buffer.clear();
 
     std::string agenda_css;
@@ -568,11 +518,12 @@ bool MDMA::fill_framework(
             switch (depth) {
                 case 1: {
                     if (tidyNodeGetId(node) != TidyTag_HTML) {
-                        tidyNodeGetText(framework, node, &tidy_buffer);
+                        tidyBufClear(&htmltidy_buffer);
+                        tidyNodeGetText(framework, node, &htmltidy_buffer);
                         assembly_buffer.append(
-                            (const char *) tidy_buffer.bp, tidy_buffer.size
+                            (const char *) htmltidy_buffer.bp,
+                            htmltidy_buffer.size
                         );
-                        tidyBufClear(&tidy_buffer);
                     }
                     else {
                         assembly_buffer.append("<html>\n");
@@ -608,22 +559,24 @@ bool MDMA::fill_framework(
                         end_tags[depth].append("</head>\n");
                     }
                     else if (tidyNodeGetId(node) == TidyTag_BODY) {
-                        tidyNodeGetText(framework, node, &tidy_buffer);
+                        tidyBufClear(&htmltidy_buffer);
+                        tidyNodeGetText(framework, node, &htmltidy_buffer);
                         std::string body_html(
-                            (const char *) tidy_buffer.bp, tidy_buffer.size
+                            (const char *) htmltidy_buffer.bp,
+                            htmltidy_buffer.size
                         );
-                        tidyBufClear(&tidy_buffer);
 
-                        assemble_framework_body(body_html, sections, headings);
+                        assemble_framework_body(body_html);
 
                         assembly_buffer.append(body_html);
                     }
                     else {
-                        tidyNodeGetText(framework, node, &tidy_buffer);
+                        tidyBufClear(&htmltidy_buffer);
+                        tidyNodeGetText(framework, node, &htmltidy_buffer);
                         assembly_buffer.append(
-                            (const char *) tidy_buffer.bp, tidy_buffer.size
+                            (const char *) htmltidy_buffer.bp,
+                            htmltidy_buffer.size
                         );
-                        tidyBufClear(&tidy_buffer);
                     }
 
                     break;
@@ -658,11 +611,12 @@ bool MDMA::fill_framework(
                         }
                     }
 
-                    tidyNodeGetText(framework, node, &tidy_buffer);
+                    tidyBufClear(&htmltidy_buffer);
+                    tidyNodeGetText(framework, node, &htmltidy_buffer);
                     assembly_buffer.append(
-                        (const char *) tidy_buffer.bp, tidy_buffer.size
+                        (const char *) htmltidy_buffer.bp,
+                        htmltidy_buffer.size
                     );
-                    tidyBufClear(&tidy_buffer);
 
                     break;
                 }
@@ -677,7 +631,21 @@ bool MDMA::fill_framework(
         assembly_buffer.append(p.second);
     }
 
-    tidyBufFree(&tidy_buffer);
+    if (!cfg.minify) {
+        tidyOptSetInt(framework, TidyIndentContent, yes);
+        tidyOptSetInt(framework, TidyIndentSpaces, 2);
+        tidyOptSetInt(framework, TidyVertSpace, yes);
+        tidyOptSetInt(framework, TidyWrapLen, 68);
+    }
+
+    tidyParseString(framework, assembly_buffer.c_str());
+    tidyCleanAndRepair(framework);
+
+    tidyBufClear(&htmltidy_buffer);
+    tidySaveBuffer(framework, &htmltidy_buffer);
+    assembly_buffer.assign(
+        (const char *) htmltidy_buffer.bp, htmltidy_buffer.size
+    );
 
     return true;
 }
@@ -808,10 +776,7 @@ TidyNode MDMA::find_if(
     return {};
 }
 
-void MDMA::assemble_framework_body(
-    std::string &body_html, const std::list<tinyxml2::XMLDocument> &sections,
-    const std::map<int, std::pair<int, std::string>> &headings
-) const {
+void MDMA::assemble_framework_body(std::string &body_html) {
     static constexpr const char *smallest_valid_html5{
         "<!DOCTYPE html><title>x</title>"
     };
@@ -824,7 +789,6 @@ void MDMA::assemble_framework_body(
         std::string html5(smallest_valid_html5);
         html5.append(body_html);
 
-        TidyBuffer tidy_buffer{};
         TidyDoc tdoc_xml = tidyCreate();
 
         setup(tdoc_xml);
@@ -832,12 +796,12 @@ void MDMA::assemble_framework_body(
         tidyParseString(tdoc_xml, html5.c_str());
 
         TidyNode body_node = tidyGetBody(tdoc_xml);
-        tidyNodeGetText(tdoc_xml, body_node, &tidy_buffer);
 
-        doc.Parse((const char *) tidy_buffer.bp, tidy_buffer.size);
+        tidyBufClear(&htmltidy_buffer);
+        tidyNodeGetText(tdoc_xml, body_node, &htmltidy_buffer);
+        doc.Parse((const char *) htmltidy_buffer.bp, htmltidy_buffer.size);
 
         tidyRelease(tdoc_xml);
-        tidyBufFree(&tidy_buffer);
     }
 
     tinyxml2::XMLElement *parent = doc.RootElement();
@@ -1018,21 +982,20 @@ void MDMA::assemble_framework_body(
         std::string html5(smallest_valid_html5);
         html5.append(body_html);
 
-        TidyBuffer tidy_buffer{};
         TidyDoc tdoc = tidyCreate();
 
         setup(tdoc);
-        tidyParseString( tdoc, html5.c_str() );
+        tidyParseString(tdoc, html5.c_str());
 
         TidyNode body = tidyGetBody(tdoc);
 
-        tidyNodeGetText(tdoc, body, &tidy_buffer);
+        tidyBufClear(&htmltidy_buffer);
+        tidyNodeGetText(tdoc, body, &htmltidy_buffer);
         body_html.assign(
-            (const char *) tidy_buffer.bp, tidy_buffer.size
+            (const char *) htmltidy_buffer.bp, htmltidy_buffer.size
         );
 
         tidyRelease(tdoc);
-        tidyBufFree(&tidy_buffer);
     }
 }
 

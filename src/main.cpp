@@ -14,10 +14,6 @@ void log(const char *text) {
     std::cerr << text << "\n";
 }
 
-void print(const char *text) {
-    std::cout << text;
-}
-
 int main(int argc, char **argv) {
     OPTIONS options(MDMA::CAPTION, MDMA::VERSION, MDMA::AUTHOR);
 
@@ -50,7 +46,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    print(output->c_str());
+    std::cout << *output;
 
     return EXIT_SUCCESS;
 }
