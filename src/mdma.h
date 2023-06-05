@@ -78,52 +78,6 @@ class MDMA {
     std::map<int, std::pair<int, std::string>> headings;
 };
 
-void MDMA::set_logger (const std::function<void(const char *)>& log_cb) {
-    log_callback = log_cb;
-}
-
-void MDMA::log(const char *fmt, ...) const {
-    if (!log_callback) return;
-
-    char stackbuf[256];
-    char *bufptr = stackbuf;
-    size_t bufsz = sizeof(stackbuf);
-
-    for (size_t i=0; i<2 && bufptr; ++i) {
-        va_list args;
-        va_start(args, fmt);
-        int cx = vsnprintf(bufptr, bufsz, fmt, args);
-        va_end(args);
-
-        if ((cx >= 0 && (size_t)cx < bufsz) || cx < 0) {
-            log_callback(bufptr);
-            break;
-        }
-
-        if (bufptr == stackbuf) {
-            bufsz = cx + 1;
-            bufptr = new (std::nothrow) char[bufsz];
-            if (!bufptr) log_callback("out of memory");
-        }
-        else {
-            log_callback(bufptr);
-            break;
-        }
-    }
-
-    if (bufptr && bufptr != stackbuf) delete [] bufptr;
-}
-
-void MDMA::bug(const char *file, int line) const {
-    log("Forbidden condition met in %s on line %d.", file, line);
-}
-
-void MDMA::die(const char *file, int line) const {
-    bug(file, line);
-    fflush(nullptr);
-    raise(SIGSEGV);
-}
-
 const std::string *MDMA::assemble(
     const char *html, size_t html_len, const char *md, size_t md_len
 ) {
@@ -997,6 +951,52 @@ void MDMA::assemble_framework_body(std::string &body_html) {
 
         tidyRelease(tdoc);
     }
+}
+
+void MDMA::set_logger (const std::function<void(const char *)>& log_cb) {
+    log_callback = log_cb;
+}
+
+void MDMA::log(const char *fmt, ...) const {
+    if (!log_callback) return;
+
+    char stackbuf[256];
+    char *bufptr = stackbuf;
+    size_t bufsz = sizeof(stackbuf);
+
+    for (size_t i=0; i<2 && bufptr; ++i) {
+        va_list args;
+        va_start(args, fmt);
+        int cx = vsnprintf(bufptr, bufsz, fmt, args);
+        va_end(args);
+
+        if ((cx >= 0 && (size_t)cx < bufsz) || cx < 0) {
+            log_callback(bufptr);
+            break;
+        }
+
+        if (bufptr == stackbuf) {
+            bufsz = cx + 1;
+            bufptr = new (std::nothrow) char[bufsz];
+            if (!bufptr) log_callback("out of memory");
+        }
+        else {
+            log_callback(bufptr);
+            break;
+        }
+    }
+
+    if (bufptr && bufptr != stackbuf) delete [] bufptr;
+}
+
+void MDMA::bug(const char *file, int line) const {
+    log("Forbidden condition met in %s on line %d.", file, line);
+}
+
+void MDMA::die(const char *file, int line) const {
+    bug(file, line);
+    fflush(nullptr);
+    raise(SIGSEGV);
 }
 
 #endif
