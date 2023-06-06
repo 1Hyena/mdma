@@ -73,12 +73,28 @@ class MDMA {
 
     void assemble_framework_body(std::string &body_html);
 
+    static std::string bin2safe(unsigned char *bytes, size_t len);
+
+    struct heading_data {
+        int *parent_id;
+        std::string *title;
+        std::string *identifier;
+    };
+
+    const heading_data *get_heading_data(int id) const;
+
     std::string assembly_buffer;
     TidyBuffer  htmltidy_buffer;
     std::function<void(const char *text)> log_callback;
     std::map<std::string, int> identifiers;
     std::list<tinyxml2::XMLDocument> sections;
-    std::map<int, std::pair<int, std::string>> headings;
+    std::map<
+        int,
+        std::tuple<
+            heading_data,
+            int, std::string, std::string
+        >
+    > headings;
 };
 
 const std::string *MDMA::assemble(
@@ -330,13 +346,15 @@ bool MDMA::parse_markdown(const char *md, size_t md_len) {
             die();
         }
 
-        std::string anchor_id(
-            std::string("anchor-").append(std::to_string(id))
-        );
+        if (!get_heading_data(id)) {
+            die();
+        }
 
-        elem->SetAttribute("id", anchor_id.c_str());
+        std::string *anchor_id = get_heading_data(id)->identifier;
+
+        elem->SetAttribute("id", anchor_id->c_str());
         elem->SetAttribute(
-            "href", std::string("#").append(anchor_id).c_str()
+            "href", std::string("#").append(*anchor_id).c_str()
         );
 
         const tinyxml2::XMLNode *child = sibling->FirstChild();
@@ -364,21 +382,19 @@ bool MDMA::fill_framework(TidyDoc framework) {
     std::map<int, std::vector<int>> heading_to_descendants;
 
     for (const auto &p : headings) {
-        int parent_id = p.second.first;
+        int parent_id = *(std::get<0>(p.second).parent_id);
 
         if (parent_id) {
             heading_to_descendants[parent_id].emplace_back(p.first);
         }
 
-        std::string anchor_id(
-            std::string("anchor-").append(std::to_string(p.first))
-        );
+        std::string *anchor_id = std::get<0>(p.second).identifier;
 
         ++heading_counter;
 
-        agenda_css.append("#MDMA-CONTENT:has(#").append(anchor_id).append(
+        agenda_css.append("#MDMA-CONTENT:has(#").append(*anchor_id).append(
             ":target) ~ .menu a[href=\"#"
-        ).append(anchor_id).append("\"]");
+        ).append(*anchor_id).append("\"]");
 
         if (heading_counter == headings.size()) {
             agenda_css.append(" {\n").append(
@@ -408,16 +424,20 @@ bool MDMA::fill_framework(TidyDoc framework) {
         int heading_id = heading_to_descendants.begin()->first;
         std::vector<int> &descendants = heading_to_descendants.at(heading_id);
 
+        if (!get_heading_data(heading_id)) die();
+
         agenda_css.append("#MDMA-CONTENT:not(\n");
-        agenda_css.append("    :has(#anchor-").append(
-            std::to_string(heading_id)
+        agenda_css.append("    :has(#").append(
+            *(get_heading_data(heading_id)->identifier)
         ).append(":target),\n");
 
         while (!descendants.empty()) {
             int descendant_id = descendants.back();
 
-            agenda_css.append("    :has(#anchor-").append(
-                std::to_string(descendant_id)
+            if (!get_heading_data(descendant_id)) die();
+
+            agenda_css.append("    :has(#").append(
+                *(get_heading_data(descendant_id)->identifier)
             ).append(":target)");
 
             descendants.pop_back();
@@ -430,8 +450,8 @@ bool MDMA::fill_framework(TidyDoc framework) {
             }
         }
 
-        agenda_css.append(") ~ .menu > .options a[href=\"#anchor-").append(
-            std::to_string(heading_id)
+        agenda_css.append(") ~ .menu > .options a[href=\"#").append(
+            *(get_heading_data(heading_id)->identifier)
         ).append("\"] + div");
 
         heading_to_descendants.erase(heading_id);
@@ -618,13 +638,47 @@ void MDMA::add_heading(
 
     level_to_id[level] = id;
 
-    /*
-    std::string slug(slugify(title));
 
-    log("[%s] ---> [%s]", title, slug.c_str());
-    */
+    std::string slug{slugify(title)};
+    std::string suffix;
 
-    headings.emplace(id, std::make_pair(parent_id, std::string(title)));
+    if (slug.empty()) {
+        slug.assign("anchor");
+    }
+
+    for (size_t i=1; i<10000; ++i) {
+        if (!identifiers.emplace(std::string(slug).append(suffix), id).second) {
+            if (slug.back() != '-') {
+                slug.append("-");
+            }
+
+            suffix.assign(std::to_string(i));
+            suffix.assign(
+                bin2safe((unsigned char*) suffix.data(), suffix.size())
+            );
+
+            continue;
+        }
+
+        slug.assign(std::string(slug).append(suffix));
+
+        auto p = headings.emplace(
+            id,
+            std::make_tuple(heading_data{}, parent_id, std::string(title), slug)
+        );
+
+        if (p.second) {
+            heading_data *data = &std::get<0>(p.first->second);
+            data->parent_id    = &std::get<1>(p.first->second);
+            data->title        = &std::get<2>(p.first->second);
+            data->identifier   = &std::get<3>(p.first->second);
+        }
+        else break;
+
+        return;
+    }
+
+    die();
 }
 
 void MDMA::setup(TidyDoc doc) const {
@@ -835,7 +889,7 @@ void MDMA::assemble_framework_body(std::string &body_html) {
         std::map<int, tinyxml2::XMLElement*> groups{{0, agenda}};
 
         for (const auto &p : headings) {
-            int parent_id = p.second.first;
+            int parent_id = *(std::get<0>(p.second).parent_id);
             tinyxml2::XMLElement *container = std::prev(groups.end())->second;
 
             if (groups.count(parent_id)) {
@@ -875,12 +929,12 @@ void MDMA::assemble_framework_body(std::string &body_html) {
             if (elem) {
                 elem->SetAttribute(
                     "href",
-                    std::string("#anchor-").append(
-                        std::to_string(p.first)
+                    std::string("#").append(
+                        std::get<0>(p.second).identifier->c_str()
                     ).c_str()
                 );
 
-                elem->InsertNewText(p.second.second.c_str());
+                elem->InsertNewText(std::get<0>(p.second).title->c_str());
             }
             else die();
         }
@@ -997,6 +1051,27 @@ void MDMA::die(const char *file, int line) const {
     bug(file, line);
     fflush(nullptr);
     raise(SIGSEGV);
+}
+
+std::string MDMA::bin2safe(unsigned char *bytes, size_t len) {
+    static const char *symbols =
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static size_t symlen = std::strlen(symbols);
+    std::string result;
+
+    for (size_t i=0; i<len; ++i) {
+        unsigned char b = bytes[i];
+        size_t index = b % symlen;
+        result.append(1, symbols[index]);
+    }
+
+    return result;
+}
+
+const MDMA::heading_data *MDMA::get_heading_data(int id) const {
+    if (!headings.count(id)) return nullptr;
+
+    return &(std::get<0>(headings.at(id)));
 }
 
 #endif
