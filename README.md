@@ -38,10 +38,11 @@ host system for successful compilation are listed.
 ```
 Usage: mdma [OPTION]... [FILE]
 Options:
-  -f  --framework     Specify a custom HTML framework file.
       --brief         Print brief messages (default).
       --debug         Print debugging messages.
+  -f  --framework     Use a custom HTML framework file.
   -h  --help          Display this usage information.
+      --minify        Disable HTML indentation and wrapping.
       --verbose       Print verbose messages.
   -v  --version       Show version information.
 
