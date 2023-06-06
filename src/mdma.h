@@ -2,7 +2,7 @@
 #ifndef MDMA_H_02_06_2023
 #define MDMA_H_02_06_2023
 
-#include "slugify.hpp"
+#include "slugify.h"
 ////////////////////////////////////////////////////////////////////////////////
 #include <cstdlib>
 #include <functional>

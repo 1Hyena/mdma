@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: MIT
 /*
 MIT License
 
 Copyright (c) 2017 Thomas Brüggemann
+Copyright (c) 2023 Erich Erstu
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,17 +23,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-#ifndef SLUGIFY_HPP
-#define SLUGIFY_HPP
+#ifndef SLUGIFY_H_06_06_2023
+#define SLUGIFY_H_06_06_2023
 
 #include <string>
 #include <unordered_map>
 #include <regex>
 #include <algorithm>
 
-// SLUGIFY
-std::string slugify(std::string input)
-{
+std::string slugify(std::string input) {
 	std::unordered_map<std::string, std::string> charMap {
 		// latin
 		{"À", "A"}, {"Á", "A"}, {"Â", "A"}, {"Ã", "A"}, {"Ä", "A"}, {"Å", "A"},
