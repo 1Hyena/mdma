@@ -37,7 +37,7 @@ host system for successful compilation are listed.
 
 ```
 Usage: mdma [OPTION]... [FILE]
-Options:
+General options:
       --brief         Print brief messages (default).
       --debug         Print debugging messages.
   -f  --framework     Use a custom HTML framework file.
@@ -46,6 +46,10 @@ Options:
   -o  --output        Output file (default is standard output).
       --verbose       Print verbose messages.
   -v  --version       Show version information.
+
+Markdown dialect options:
+      --commonmark    CommonMark (default).
+      --github        Github flavored markdown.
 
 ```
 

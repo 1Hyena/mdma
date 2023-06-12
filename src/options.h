@@ -12,7 +12,7 @@ class OPTIONS {
     public:
     static constexpr const char *usage_format{
         "Usage: %s [OPTION]... [FILE]\n"
-        "Options:\n"
+        "General options:\n"
         "      --brief         Print brief messages (default).\n"
         "      --debug         Print debugging messages.\n"
         "  -f  --framework     Use a custom HTML framework file.\n"
@@ -21,12 +21,21 @@ class OPTIONS {
         "  -o  --output        Output file (default is standard output).\n"
         "      --verbose       Print verbose messages.\n"
         "  -v  --version       Show version information.\n"
+        "\n"
+        "Markdown dialect options:\n"
+        "      --commonmark    CommonMark (default).\n"
+        "      --github        Github flavored markdown.\n"
     };
+
+    static constexpr const int
+        DIALECT_COMMONMARK = 0,
+        DIALECT_GITHUB     = 1;
 
     struct flagset_type {
         int verbose;
         int debug;
         int minify;
+        int dialect;
         int exit;
     };
 
@@ -36,6 +45,7 @@ class OPTIONS {
                 .verbose = 0,
                 .debug   = 0,
                 .minify  = 0,
+                .dialect = DIALECT_COMMONMARK,
                 .exit    = 0
             }
         )
@@ -65,16 +75,19 @@ class OPTIONS {
     ) {
         static struct option long_options[] = {
             // These options set a flag:
-            { "debug",       no_argument,       &flags.debug,   1 },
-            { "brief",       no_argument,       &flags.verbose, 0 },
-            { "verbose",     no_argument,       &flags.verbose, 1 },
-            { "minify",      no_argument,       &flags.minify,  1 },
+            { "debug",      no_argument, &flags.debug,                    1 },
+            { "brief",      no_argument, &flags.verbose,                  0 },
+            { "verbose",    no_argument, &flags.verbose,                  1 },
+            { "minify",     no_argument, &flags.minify,                   1 },
+            { "commonmark", no_argument, &flags.dialect, DIALECT_COMMONMARK },
+            { "github",     no_argument, &flags.dialect,     DIALECT_GITHUB },
+
             // These options don't set a flag. We distinguish them by indices:
-            { "framework",   required_argument, 0,             'f'},
-            { "output",      required_argument, 0,             'o'},
-            { "help",        no_argument,       0,             'h'},
-            { "version",     no_argument,       0,             'v'},
-            { 0,             0,                 0,              0 }
+            { "framework",   required_argument, 0, 'f'},
+            { "output",      required_argument, 0, 'o'},
+            { "help",        no_argument,       0, 'h'},
+            { "version",     no_argument,       0, 'v'},
+            { 0,             0,                 0,  0 }
         };
 
         this->log_callback = log_callback;
@@ -123,7 +136,7 @@ class OPTIONS {
                 }
                 case 'v': {
                     const char *compile_date = __DATE__;
-                    const char *compile_year = "2017";
+                    const char *compile_year = "unknown year";
                     size_t compile_date_len = strlen(compile_date);
 
                     while (compile_date_len) {

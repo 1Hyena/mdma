@@ -24,6 +24,7 @@ class MDMA {
 
     MDMA() : cfg(
         {
+            .github = false,
             .minify = false
         }
     )
@@ -38,6 +39,7 @@ class MDMA {
     }
 
     struct cfg_type {
+        bool github:1;
         bool minify:1;
     } cfg;
 
@@ -209,7 +211,9 @@ bool MDMA::parse_markdown(const char *md, size_t md_len) {
             std::string *dest = static_cast<std::string *>(userdata);
             dest->append(str, len);
         },
-        &xhtml, MD_DIALECT_GITHUB, MD_HTML_FLAG_XHTML
+        &xhtml,
+        cfg.github ? MD_DIALECT_GITHUB : MD_DIALECT_COMMONMARK,
+        MD_HTML_FLAG_XHTML
     );
 
     if (fail) {
