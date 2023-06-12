@@ -46,7 +46,19 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    std::cout << *output;
+    if (!options.output.empty()) {
+        std::ofstream stream(options.output, std::ios::binary);
+
+        if (!stream) {
+            std::cerr << options.output << ": " << strerror(errno) << "\n";
+            return EXIT_FAILURE;
+        }
+
+        stream << *output;
+    }
+    else {
+        std::cout << *output;
+    }
 
     return EXIT_SUCCESS;
 }

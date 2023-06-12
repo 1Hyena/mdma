@@ -18,6 +18,7 @@ class OPTIONS {
         "  -f  --framework     Use a custom HTML framework file.\n"
         "  -h  --help          Display this usage information.\n"
         "      --minify        Disable HTML indentation and wrapping.\n"
+        "  -o  --output        Output file (default is standard output).\n"
         "      --verbose       Print verbose messages.\n"
         "  -v  --version       Show version information.\n"
     };
@@ -40,6 +41,7 @@ class OPTIONS {
         )
         , file         (        "" )
         , framework    (        "" )
+        , output       (        "" )
         , caption      (   caption )
         , version      (   version )
         , copyright    ( copyright )
@@ -51,6 +53,7 @@ class OPTIONS {
     flagset_type flags;
     std::string  file;
     std::string  framework;
+    std::string  output;
 
     std::string caption;
     std::string version;
@@ -68,6 +71,7 @@ class OPTIONS {
             { "minify",      no_argument,       &flags.minify,  1 },
             // These options don't set a flag. We distinguish them by indices:
             { "framework",   required_argument, 0,             'f'},
+            { "output",      required_argument, 0,             'o'},
             { "help",        no_argument,       0,             'h'},
             { "version",     no_argument,       0,             'v'},
             { 0,             0,                 0,              0 }
@@ -80,7 +84,7 @@ class OPTIONS {
             int option_index = 0;
 
             int c = getopt_long(
-                argc, argv, "f:hv", long_options, &option_index
+                argc, argv, "f:o:hv", long_options, &option_index
             );
 
             // Detect the end of the options.
@@ -111,6 +115,10 @@ class OPTIONS {
                     fprintf(stdout, usage_format, argv[0]);
                     flags.exit = 1;
 
+                    break;
+                }
+                case 'o': {
+                    output.assign(optarg);
                     break;
                 }
                 case 'v': {

@@ -43,6 +43,7 @@ Options:
   -f  --framework     Use a custom HTML framework file.
   -h  --help          Display this usage information.
       --minify        Disable HTML indentation and wrapping.
+  -o  --output        Output file (default is standard output).
       --verbose       Print verbose messages.
   -v  --version       Show version information.
 
