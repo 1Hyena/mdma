@@ -18,13 +18,13 @@ class OPTIONS {
         "  -f  --framework     Use a custom HTML framework file.\n"
         "  -h  --help          Display this usage information.\n"
         "      --minify        Disable HTML indentation and wrapping.\n"
-        "  -o  --output        Output file (default is standard output).\n"
+        "  -o  --output        Specify output file (default: stdout).\n"
         "      --verbose       Print verbose messages.\n"
         "  -v  --version       Show version information.\n"
         "\n"
         "Markdown dialect options:\n"
-        "      --commonmark    CommonMark (default).\n"
-        "      --github        Github flavored markdown.\n"
+        "      --commonmark    Use the CommonMark syntax.\n"
+        "      --github        Use Github flavored markdown (default).\n"
     };
 
     static constexpr const int
@@ -45,7 +45,7 @@ class OPTIONS {
                 .verbose = 0,
                 .debug   = 0,
                 .minify  = 0,
-                .dialect = DIALECT_COMMONMARK,
+                .dialect = DIALECT_GITHUB,
                 .exit    = 0
             }
         )

@@ -43,13 +43,13 @@ General options:
   -f  --framework     Use a custom HTML framework file.
   -h  --help          Display this usage information.
       --minify        Disable HTML indentation and wrapping.
-  -o  --output        Output file (default is standard output).
+  -o  --output        Specify output file (default: stdout).
       --verbose       Print verbose messages.
   -v  --version       Show version information.
 
 Markdown dialect options:
-      --commonmark    CommonMark (default).
-      --github        Github flavored markdown.
+      --commonmark    Use the CommonMark syntax.
+      --github        Use Github flavored markdown (default).
 
 ```
 
@@ -82,4 +82,5 @@ and their respective header files must be present in the system.
 
 # License ######################################################################
 
-MDMA is authored by Erich Erstu and released under the [MIT](LICENSE) license.
+MarkDown Monolith Assembler has been authored by Erich Erstu and is released
+under the [MIT](LICENSE) license.

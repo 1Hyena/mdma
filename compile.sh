@@ -3,4 +3,4 @@ cd src
 make clean
 make
 cd ..
-./mdma --github README.md >framework.html
+./mdma README.md >framework.html
