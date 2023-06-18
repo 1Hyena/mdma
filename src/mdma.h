@@ -360,6 +360,7 @@ bool MDMA::parse_markdown(const char *md, size_t md_len) {
         elem->SetAttribute(
             "href", std::string("#").append(*anchor_id).c_str()
         );
+        elem->SetAttribute("target", "_self");
 
         const tinyxml2::XMLNode *child = sibling->FirstChild();
 
@@ -396,8 +397,8 @@ bool MDMA::fill_framework(TidyDoc framework) {
 
         ++heading_counter;
 
-        agenda_css.append("#MDMA-CONTENT:has(#").append(*anchor_id).append(
-            ":target) ~ .menu a[href=\"#"
+        agenda_css.append("body:has(#").append(*anchor_id).append(
+            ":target) #MDMA-AGENDA a[href=\"#"
         ).append(*anchor_id).append("\"]");
 
         if (heading_counter == headings.size()) {
@@ -430,7 +431,7 @@ bool MDMA::fill_framework(TidyDoc framework) {
 
         if (!get_heading_data(heading_id)) die();
 
-        agenda_css.append("#MDMA-CONTENT:not(\n");
+        agenda_css.append("body:not(\n");
         agenda_css.append("    :has(#").append(
             *(get_heading_data(heading_id)->identifier)
         ).append(":target),\n");
@@ -454,7 +455,7 @@ bool MDMA::fill_framework(TidyDoc framework) {
             }
         }
 
-        agenda_css.append(") ~ .menu > .options a[href=\"#").append(
+        agenda_css.append(") #MDMA-AGENDA a[href=\"#").append(
             *(get_heading_data(heading_id)->identifier)
         ).append("\"] + div");
 
@@ -931,6 +932,7 @@ void MDMA::assemble_framework_body(std::string &body_html) {
             tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
 
             if (elem) {
+                elem->SetAttribute("target", "_self");
                 elem->SetAttribute(
                     "href",
                     std::string("#").append(
@@ -978,6 +980,30 @@ void MDMA::assemble_framework_body(std::string &body_html) {
             );
 
             fix_el->DeleteAttribute("align");
+
+            return false;
+        }
+    );
+
+    find_if(
+        *parent,
+        [](const tinyxml2::XMLNode &node, int) {
+            const tinyxml2::XMLElement *el = node.ToElement();
+            const char *name = el ? el->Name() : nullptr;
+
+            if (!name || strcasecmp("a", name)) {
+                return false;
+            }
+
+            if (el->Attribute("target")) {
+                return false;
+            }
+
+            tinyxml2::XMLElement *fix_el{
+                const_cast<tinyxml2::XMLElement *>(el)
+            };
+
+            fix_el->SetAttribute("target", "_blank");
 
             return false;
         }
