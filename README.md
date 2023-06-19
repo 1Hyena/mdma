@@ -80,6 +80,16 @@ and their respective header files must be present in the system.
   A tool to tidy down HTML code to a clean style
 
 
+# Showcase #####################################################################
+
+Next, some of the projects that have put MarkDown Monolith Assembler into a good
+use are listed.
+
+|                  ![Screenshot](showcase/ericherstu.net.jpg)                  |
+| :--------------------------------------------------------------------------: |
+|                  [ErichErstu.net](https://ErichErstu.net/)                   |
+
+
 # License ######################################################################
 
 MarkDown Monolith Assembler has been authored by Erich Erstu and is released

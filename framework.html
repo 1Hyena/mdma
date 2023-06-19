@@ -221,6 +221,7 @@
     body:has(#Synopsis:target) #MDMA-AGENDA a[href="#Synopsis"],
     body:has(#Build-Instructions:target) #MDMA-AGENDA a[href="#Build-Instructions"],
     body:has(#Dependencies:target) #MDMA-AGENDA a[href="#Dependencies"],
+    body:has(#Showcase:target) #MDMA-AGENDA a[href="#Showcase"],
     body:has(#License:target) #MDMA-AGENDA a[href="#License"] {
     color: var(--MDMA-AGENDA-TARGET-COLOR);
     }
@@ -401,6 +402,38 @@ Markdown dialect options:
 
               <article class="tab">
                 <h1>
+                  <a id="Showcase" href="#Showcase" target=
+                  "_self">Showcase</a>
+                </h1>
+
+                <p>
+                  Next, some of the projects that have put MarkDown
+                  Monolith Assembler into a good use are listed.
+                </p>
+
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="text-align: center;">
+                        <img src="showcase/ericherstu.net.jpg" alt=
+                        "Screenshot">
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <tr>
+                      <td style="text-align: center;">
+                        <a href="https://ErichErstu.net/" target=
+                        "_blank">ErichErstu.net</a>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </article>
+
+              <article class="tab">
+                <h1>
                   <a id="License" href="#License" target=
                   "_self">License</a>
                 </h1>
@@ -428,7 +461,9 @@ Markdown dialect options:
                     Instructions</a><a target="_self" href=
                     "#Dependencies">Dependencies</a>
                   </div>
-                  <a target="_self" href="#License">License</a>
+                  <a target="_self" href=
+                  "#Showcase">Showcase</a><a target="_self" href=
+                  "#License">License</a>
                 </div>
               </div>
             </div>
