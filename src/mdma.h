@@ -14,6 +14,7 @@
 #include <list>
 #include <tinyxml2.h>
 #include <md4c-html.h>
+#include <uriparser/Uri.h>
 #include <signal.h>
 
 class MDMA {
@@ -48,6 +49,8 @@ class MDMA {
     const std::string *assemble(
         const char *htm, size_t htm_sz, const char *md, size_t md_sz
     );
+
+    static std::string uri_param_value(const char *uri, const char *key);
 
     private:
     void bug(const char * =__builtin_FILE(), int =__builtin_LINE()) const;
@@ -985,14 +988,41 @@ void MDMA::assemble_framework_body(std::string &body_html) {
         }
     );
 
+    std::vector<tinyxml2::XMLNode *> video_links;
+    static constexpr const std::string_view video_prefix{
+        "https://www.youtube.com/watch?"
+    };
+
     find_if(
         *parent,
-        [](const tinyxml2::XMLNode &node, int) {
+        [&video_links](const tinyxml2::XMLNode &node, int) {
             const tinyxml2::XMLElement *el = node.ToElement();
             const char *name = el ? el->Name() : nullptr;
 
             if (!name || strcasecmp("a", name)) {
                 return false;
+            }
+
+            const char *href = el->Attribute("href");
+
+            if (href
+            && !strncasecmp(href, video_prefix.data(), video_prefix.size())) {
+                const tinyxml2::XMLNode *child = node.FirstChild();
+
+                if (child && child == node.LastChild()) {
+                    const tinyxml2::XMLElement *child_el = child->ToElement();
+                    const char *child_name{
+                        child_el ? child_el->Name() : nullptr
+                    };
+
+                    if (child_name
+                    && !strcasecmp("img", child_name)
+                    && child->NoChildren()) {
+                        video_links.emplace_back(
+                            const_cast<tinyxml2::XMLNode *>(&node)
+                        );
+                    }
+                }
             }
 
             if (el->Attribute("target")) {
@@ -1008,6 +1038,60 @@ void MDMA::assemble_framework_body(std::string &body_html) {
             return false;
         }
     );
+
+    while (!video_links.empty()) {
+        tinyxml2::XMLNode *link = video_links.back();
+        tinyxml2::XMLNode *link_parent = link->Parent();
+        tinyxml2::XMLElement *link_el = link->ToElement();
+
+        const char *link_href{
+            link_el ? link_el->Attribute("href") : nullptr
+        };
+
+        std::string video_id{link_href ? uri_param_value(link_href, "v") : ""};
+
+        tinyxml2::XMLNode *div{
+            !video_id.empty() ? (
+                link_parent->InsertAfterChild(link, doc.NewElement("div"))
+            ) : nullptr
+        };
+
+        tinyxml2::XMLElement *div_el = div ? div->ToElement() : nullptr;
+
+        if (div_el) {
+            tinyxml2::XMLNode *node = link->DeepClone(&doc);
+
+            if (node) {
+                div->InsertEndChild(node);
+            }
+
+            div_el->SetAttribute("class", "MDMA-VIDEO-CONTAINER");
+
+            tinyxml2::XMLNode *iframe{
+                div->InsertAfterChild(node, doc.NewElement("iframe"))
+            };
+
+            tinyxml2::XMLElement *iframe_el{
+                iframe ? iframe->ToElement() : nullptr
+            };
+
+            if (iframe_el) {
+                iframe_el->SetAttribute(
+                    "src",
+                    std::string(
+                        "https://www.youtube.com/embed/"
+                    ).append(video_id).c_str()
+                );
+
+                iframe_el->SetAttribute("loading", "lazy");
+                iframe_el->SetAttribute("allowfullscreen", "");
+            }
+
+            doc.DeleteNode(link);
+        }
+
+        video_links.pop_back();
+    }
 
     find_if(
         *parent,
@@ -1126,6 +1210,41 @@ const MDMA::heading_data *MDMA::get_heading_data(int id) const {
     if (!headings.count(id)) return nullptr;
 
     return &(std::get<0>(headings.at(id)));
+}
+
+std::string MDMA::uri_param_value(const char *uri_str, const char *key) {
+    std::string result;
+    UriUriA uri;
+    const char *errorPos;
+
+    if (uriParseSingleUriA(&uri, uri_str, &errorPos) != URI_SUCCESS) {
+        return result;
+    }
+
+    UriQueryListA * list;
+    int count;
+    auto uri_result{
+        uriDissectQueryMallocA(
+            &list, &count, uri.query.first, uri.query.afterLast
+        )
+    };
+
+    if (uri_result != URI_SUCCESS) {
+        uriFreeUriMembersA(&uri);
+        return result;
+    }
+
+    for (UriQueryListStructA *param = list; param; param = param->next) {
+        if (!strcmp(key, param->key)) {
+            result.assign(param->value);
+            break;
+        }
+    }
+
+    uriFreeQueryListA(list);
+    uriFreeUriMembersA(&uri);
+
+    return result;
 }
 
 #endif

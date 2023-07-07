@@ -153,6 +153,20 @@
         padding-left: 0.5rem;
     }
 
+    .MDMA-VIDEO-CONTAINER {
+        position: relative;
+    }
+
+    .MDMA-VIDEO-CONTAINER iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+    }
+
     .tab {
         position: relative;
         display: block;
@@ -273,7 +287,7 @@
                         title=
                         "Click to see this document in your web browser"
                         target="_blank"><img src="screenshot.jpg"
-                        alt="Screenshot"></a>
+                        alt="Screenshot" loading="lazy"></a>
                       </th>
                     </tr>
                   </thead>
@@ -397,6 +411,16 @@ Markdown dialect options:
                       code to a clean style
                     </p>
                   </li>
+
+                  <li>
+                    <p>
+                      <a href=
+                      "https://github.com/uriparser/uriparser"
+                      target="_blank">uriparser</a> — Strictly RFC
+                      3986 compliant URI parsing and handling
+                      library written in C89
+                    </p>
+                  </li>
                 </ul>
               </article>
 
@@ -416,7 +440,7 @@ Markdown dialect options:
                     <tr>
                       <th style="text-align: center;">
                         <img src="showcase/ericherstu.net.jpg" alt=
-                        "Screenshot">
+                        "Screenshot" loading="lazy">
                       </th>
                     </tr>
                   </thead>

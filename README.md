@@ -79,6 +79,9 @@ and their respective header files must be present in the system.
 * [tidy](https://www.html-tidy.org/) —
   A tool to tidy down HTML code to a clean style
 
+* [uriparser](https://github.com/uriparser/uriparser) —
+  Strictly RFC 3986 compliant URI parsing and handling library written in C89
+
 
 # Showcase #####################################################################
 
