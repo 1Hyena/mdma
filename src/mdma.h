@@ -1009,6 +1009,30 @@ void MDMA::assemble_framework_body(std::string &body_html) {
         }
     );
 
+    find_if(
+        *parent,
+        [](const tinyxml2::XMLNode &node, int) {
+            const tinyxml2::XMLElement *el = node.ToElement();
+            const char *name = el ? el->Name() : nullptr;
+
+            if (!name || strcasecmp("img", name)) {
+                return false;
+            }
+
+            if (el->Attribute("loading")) {
+                return false;
+            }
+
+            tinyxml2::XMLElement *fix_el{
+                const_cast<tinyxml2::XMLElement *>(el)
+            };
+
+            fix_el->SetAttribute("loading", "lazy");
+
+            return false;
+        }
+    );
+
     tinyxml2::XMLPrinter printer(nullptr, true);
     doc.Print(&printer);
 
