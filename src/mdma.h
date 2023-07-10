@@ -1088,7 +1088,7 @@ void MDMA::assemble_framework_body(std::string &body_html) {
                 iframe_el->SetAttribute(
                     "src",
                     std::string(
-                        "https://www.youtube.com/embed/"
+                        "https://www.youtube-nocookie.com/embed/"
                     ).append(video_id).c_str()
                 );
 
