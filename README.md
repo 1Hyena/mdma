@@ -82,6 +82,9 @@ and their respective header files must be present in the system.
 * [uriparser](https://github.com/uriparser/uriparser) —
   Strictly RFC 3986 compliant URI parsing and handling library written in C89
 
+* [cimg](https://cimg.eu/) —
+  A small and open-source C++ library for image processing
+
 
 # Showcase #####################################################################
 
