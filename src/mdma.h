@@ -1132,9 +1132,15 @@ void MDMA::assemble_framework_body(std::string &body_html) {
 
         const char *src = el->Attribute("src");
 
-        static constexpr const std::string_view data_prefix{"data:"};
+        static constexpr const std::string_view
+            data_prefix { "data:"    },
+            http_prefix { "http://"  },
+            https_prefix{ "https://" };
 
-        if (src && strncasecmp(src, data_prefix.data(), data_prefix.size())
+        if (src
+        && strncasecmp(src, data_prefix.data(), data_prefix.size())
+        && strncasecmp(src, http_prefix.data(), http_prefix.size())
+        && strncasecmp(src, https_prefix.data(), https_prefix.size())
         && !el->Attribute("width") && !el->Attribute("height")) {
             std::filesystem::path path(directory / src);
 
