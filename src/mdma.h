@@ -15,7 +15,9 @@
 #include <tinyxml2.h>
 #include <md4c-html.h>
 #include <uriparser/Uri.h>
+#include <CImg.h>
 #include <signal.h>
+#include <filesystem>
 
 class MDMA {
     public:
@@ -29,6 +31,7 @@ class MDMA {
             .minify = false
         }
     )
+    , directory("")
     , assembly_buffer("")
     , htmltidy_buffer{}
     , log_callback(nullptr) {
@@ -45,6 +48,7 @@ class MDMA {
     } cfg;
 
     void set_logger(const std::function<void(const char *)>& log_callback);
+    void set_directory(const std::filesystem::path &);
 
     const std::string *assemble(
         const char *htm, size_t htm_sz, const char *md, size_t md_sz
@@ -88,6 +92,7 @@ class MDMA {
 
     const heading_data *get_heading_data(int id) const;
 
+    std::filesystem::path directory;
     std::string assembly_buffer;
     TidyBuffer  htmltidy_buffer;
     std::function<void(const char *text)> log_callback;
@@ -1102,9 +1107,11 @@ void MDMA::assemble_framework_body(std::string &body_html) {
         video_links.pop_back();
     }
 
+    std::vector<tinyxml2::XMLElement *> images;
+
     find_if(
         *parent,
-        [](const tinyxml2::XMLNode &node, int) {
+        [&images](const tinyxml2::XMLNode &node, int) {
             const tinyxml2::XMLElement *el = node.ToElement();
             const char *name = el ? el->Name() : nullptr;
 
@@ -1112,19 +1119,42 @@ void MDMA::assemble_framework_body(std::string &body_html) {
                 return false;
             }
 
-            if (el->Attribute("loading")) {
-                return false;
-            }
-
-            tinyxml2::XMLElement *fix_el{
-                const_cast<tinyxml2::XMLElement *>(el)
-            };
-
-            fix_el->SetAttribute("loading", "lazy");
+            images.emplace_back(const_cast<tinyxml2::XMLElement *>(el));
 
             return false;
         }
     );
+
+    for (tinyxml2::XMLElement *el : images) {
+        if (!el->Attribute("loading")) {
+            el->SetAttribute("loading", "lazy");
+        }
+
+        const char *src = el->Attribute("src");
+
+        static constexpr const std::string_view data_prefix{"data:"};
+
+        if (src && strncasecmp(src, data_prefix.data(), data_prefix.size())
+        && !el->Attribute("width") && !el->Attribute("height")) {
+            std::filesystem::path path(directory / src);
+
+            int w, h;
+            cimg_library::cimg::exception_mode(0);
+
+            try {
+                cimg_library::CImg<unsigned char> image(path.c_str());
+                w = image.width();
+                h = image.height();
+            }
+            catch (cimg_library::CImgIOException &e) {
+                this->log("Error opening file: %s", src);
+                continue;
+            }
+
+            el->SetAttribute("width",  std::to_string(w).c_str());
+            el->SetAttribute("height", std::to_string(h).c_str());
+        }
+    }
 
     std::vector<tinyxml2::XMLElement *> checkpoints;
 
@@ -1222,6 +1252,10 @@ void MDMA::assemble_framework_body(std::string &body_html) {
 
 void MDMA::set_logger(const std::function<void(const char *)>& log_cb) {
     log_callback = log_cb;
+}
+
+void MDMA::set_directory(const std::filesystem::path &path) {
+    directory = path;
 }
 
 void MDMA::log(const char *fmt, ...) const {

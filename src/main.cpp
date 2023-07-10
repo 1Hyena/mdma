@@ -10,14 +10,14 @@
 bool load_framework(const std::string &path, std::string &dest);
 bool load_markdown (const std::string &path, std::string &dest);
 
-void log(const char *text) {
+void log_text(const char *text) {
     std::cerr << text << "\n";
 }
 
 int main(int argc, char **argv) {
     OPTIONS options(MDMA::CAPTION, MDMA::VERSION, MDMA::AUTHOR);
 
-    if (!options.deserialize(argc, argv, log)) {
+    if (!options.deserialize(argc, argv, log_text)) {
         return EXIT_FAILURE;
     }
 
@@ -37,7 +37,17 @@ int main(int argc, char **argv) {
     mdma.cfg.minify = options.flags.minify;
     mdma.cfg.github = options.flags.dialect == OPTIONS::DIALECT_GITHUB;
 
-    mdma.set_logger(log);
+    mdma.set_logger(log_text);
+
+    mdma.set_directory(
+        options.file.empty() ? (
+            std::filesystem::current_path()
+        ) : (
+            std::filesystem::absolute(
+                std::filesystem::path(options.file)
+            ).remove_filename()
+        )
+    );
 
     const std::string *output{
         mdma.assemble(html.data(), html.size(), md.data(), md.size())
