@@ -15,7 +15,7 @@
 #include <tinyxml2.h>
 #include <md4c-html.h>
 #include <uriparser/Uri.h>
-#include <CImg.h>
+#include <Imlib2.h>
 #include <signal.h>
 #include <filesystem>
 
@@ -1144,21 +1144,27 @@ void MDMA::assemble_framework_body(std::string &body_html) {
         && !el->Attribute("width") && !el->Attribute("height")) {
             std::filesystem::path path(directory / src);
 
-            int w, h;
-            cimg_library::cimg::exception_mode(0);
+            Imlib_Image image;
 
-            try {
-                cimg_library::CImg<unsigned char> image(path.c_str());
-                w = image.width();
-                h = image.height();
+            image = imlib_load_image(path.c_str());
+
+            if (image) {
+                imlib_context_set_image(image);
+
+                el->SetAttribute(
+                    "width", std::to_string(imlib_image_get_width()).c_str()
+                );
+
+                el->SetAttribute(
+                    "height", std::to_string(imlib_image_get_height()).c_str()
+                );
+
+                imlib_free_image();
             }
-            catch (cimg_library::CImgIOException &e) {
+            else {
                 this->log("Error opening file: %s", src);
                 continue;
             }
-
-            el->SetAttribute("width",  std::to_string(w).c_str());
-            el->SetAttribute("height", std::to_string(h).c_str());
         }
     }
 
