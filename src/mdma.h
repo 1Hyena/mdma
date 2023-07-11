@@ -18,6 +18,8 @@
 #include <Imlib2.h>
 #include <signal.h>
 #include <filesystem>
+#include <sys/mman.h>
+#include <b64/encode.h>
 
 class MDMA {
     public:
@@ -1143,22 +1145,145 @@ void MDMA::assemble_framework_body(std::string &body_html) {
         && strncasecmp(src, https_prefix.data(), https_prefix.size())
         && !el->Attribute("width") && !el->Attribute("height")) {
             std::filesystem::path path(directory / src);
+            Imlib_Load_Error img_err;
+            Imlib_Image img_src = imlib_load_image_with_error_return(
+                path.c_str(), &img_err
+            );
 
-            Imlib_Image image;
+            if (img_err) {
+                log("%s: error %d when trying to load", path.c_str(), img_err);
+            }
 
-            image = imlib_load_image(path.c_str());
+            if (img_src) {
+                imlib_context_set_image(img_src);
 
-            if (image) {
-                imlib_context_set_image(image);
+                int src_w = imlib_image_get_width();
+                int src_h = imlib_image_get_height();
 
-                el->SetAttribute(
-                    "width", std::to_string(imlib_image_get_width()).c_str()
-                );
+                el->SetAttribute("width",  std::to_string(src_w).c_str());
+                el->SetAttribute("height", std::to_string(src_h).c_str());
 
-                el->SetAttribute(
-                    "height", std::to_string(imlib_image_get_height()).c_str()
-                );
+                int dst_w = src_w / 8;
+                int dst_h = src_h / 8;
 
+                Imlib_Image img_dst{};
+
+                if (dst_w > 0 && dst_h > 0 && !el->Attribute("style")) {
+                    img_dst = imlib_create_cropped_scaled_image(
+                        0, 0, src_w, src_h, dst_w, dst_h
+                    );
+                }
+
+                if (img_dst) {
+                    const char *src_fmt = imlib_image_format();
+                    const char *src_nam = imlib_image_get_filename();
+
+                    std::string filename(
+                        src_nam ? src_nam : (
+                            std::string("mdma-imgbuf").append(".").append(
+                                src_fmt
+                            ).c_str()
+                        )
+                    );
+
+                    imlib_context_set_image(img_dst);
+                    imlib_image_set_format(src_fmt);
+
+                    FILE *fptr;
+                    int fd, errcode{
+                        (
+                            fd = memfd_create(
+                                filename.c_str(), MFD_ALLOW_SEALING
+                            )
+                        ) == -1 ? errno : 0
+                    };
+
+                    if (fd == -1) {
+                        log("memfd_create: %s", strerror(errcode));
+                    }
+                    else if ( (fptr = fdopen(fd, "r")) == nullptr) {
+                        errcode = errno;
+                        log("fdopen(%d): %s", fd, strerror(errcode));
+                    }
+                    else {
+                        std::string style(
+                            std::string(
+                                "background-size: cover;background-image: url('"
+                            ).append(
+                                "data:image/").append(src_fmt).append(
+                                ";base64,"
+                            )
+                        );
+
+                        size_t dst_fsz = 0;
+                        int tmpfd, errcode{(tmpfd = dup(fd)) == -1 ? errno : 0};
+
+                        if (tmpfd != -1) {
+                            imlib_save_image_fd(tmpfd, filename.c_str());
+                            fseek(fptr, 0, SEEK_SET);
+
+                            std::array<unsigned char, 4*1024> readbuf;
+                            std::array<char, readbuf.size()*2> base64buf;
+                            ssize_t nb;
+                            base64::base64_encodestate b64e;
+                            base64::base64_init_encodestate(&b64e);
+
+                            do {
+                                nb = read(fd, readbuf.data(), readbuf.size());
+
+                                if (nb == -1) {
+                                    log("read(%d): %s", fd, strerror(errno));
+                                    style.clear();
+
+                                    break;
+                                }
+                                else if (nb == 0) {
+                                    style.append(
+                                        base64buf.data(),
+                                        base64::base64_encode_blockend(
+                                            base64buf.data(), &b64e
+                                        )
+                                    ).append("');");
+
+                                    break;
+                                }
+                                else if (nb > 0) {
+                                    style.append(
+                                        base64buf.data(),
+                                        base64::base64_encode_block(
+                                            (const char *) readbuf.data(),
+                                            int(nb), base64buf.data(), &b64e
+                                        )
+                                    );
+
+                                    dst_fsz += size_t(nb);
+                                }
+                                else die();
+                            } while (nb != 0);
+                        }
+                        else log("dup(%d): %s", fd, strerror(errcode));
+
+                        if (close(fd) == -1) {
+                            errcode = errno;
+                            log("close(%d): %s", fd, strerror(errcode));
+                        }
+
+                        if (dst_fsz && !style.empty()) {
+                            style.erase(
+                                std::remove_if(
+                                    style.begin(), style.end(), ::isspace
+                                ),
+                                style.end()
+                            );
+
+                            el->SetAttribute("style", style.c_str());
+                        }
+                    }
+
+                    imlib_free_image();
+                }
+
+                imlib_context_set_image(img_src);
                 imlib_free_image();
             }
             else {
