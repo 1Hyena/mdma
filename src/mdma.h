@@ -1210,7 +1210,11 @@ void MDMA::assemble_framework_body(std::string &body_html) {
                             std::string(
                                 "background-size: cover;background-image: url('"
                             ).append(
-                                "data:image/").append(src_fmt).append(
+                                "data:image/").append(
+                                    !strcasecmp("jpg", src_fmt) ? (
+                                        "jpeg"
+                                    ) : src_fmt
+                                ).append(
                                 ";base64,"
                             )
                         );
