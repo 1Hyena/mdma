@@ -1168,7 +1168,8 @@ void MDMA::assemble_framework_body(std::string &body_html) {
 
                 Imlib_Image img_dst{};
 
-                if (dst_w > 0 && dst_h > 0 && !el->Attribute("style")) {
+                if (dst_w > 0 && dst_h > 0 && !el->Attribute("style")
+                && !imlib_image_has_alpha()) {
                     img_dst = imlib_create_cropped_scaled_image(
                         0, 0, src_w, src_h, dst_w, dst_h
                     );
