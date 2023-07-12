@@ -26,6 +26,9 @@ class MDMA {
     static constexpr const char *CAPTION = "MarkDown Monolith Assembler";
     static constexpr const char *VERSION = "1.0";
     static constexpr const char *AUTHOR  = "Erich Erstu";
+    static constexpr const char *smallest_valid_html5{
+        "<!DOCTYPE html><title>x</title>"
+    };
 
     MDMA() : cfg(
         {
@@ -82,7 +85,23 @@ class MDMA {
         std::function<bool(const tinyxml2::XMLNode &, int)> fun
     ) const;
 
-    void assemble_framework_body(std::string &body_html);
+    tinyxml2::XMLElement *find_element(
+        const tinyxml2::XMLNode &root, const char *id
+    ) const;
+
+    std::string assemble_framework_body(const char *body_html);
+
+    void install_content(tinyxml2::XMLDocument &) const;
+    void install_agenda (tinyxml2::XMLDocument &) const;
+    void install_loader (tinyxml2::XMLDocument &) const;
+    void enhance_tables (tinyxml2::XMLDocument &) const;
+    void enhance_videos (tinyxml2::XMLDocument &) const;
+    void enhance_images (tinyxml2::XMLDocument &) const;
+
+    void enhance_image(tinyxml2::XMLElement &element) const;
+
+    void html2xml(const std::string &html, tinyxml2::XMLDocument &xml);
+    std::string xml2html(const char *xml);
 
     static std::string bin2safe(unsigned char *bytes, size_t len);
 
@@ -548,13 +567,15 @@ bool MDMA::fill_framework(TidyDoc framework) {
                     else if (tidyNodeGetId(node) == TidyTag_BODY) {
                         tidyBufClear(&htmltidy_buffer);
                         tidyNodeGetText(framework, node, &htmltidy_buffer);
-                        std::string body_html(
-                            (const char *) htmltidy_buffer.bp,
-                            htmltidy_buffer.size
-                        );
 
-                        assemble_framework_body(body_html);
-                        assembly_buffer.append(body_html);
+                        assembly_buffer.append(
+                            assemble_framework_body(
+                                std::string(
+                                    (const char *) htmltidy_buffer.bp,
+                                    htmltidy_buffer.size
+                                ).c_str()
+                            )
+                        );
                     }
                     else {
                         tidyBufClear(&htmltidy_buffer);
@@ -764,6 +785,26 @@ tinyxml2::XMLNode *MDMA::find_if(
     return nullptr;
 }
 
+tinyxml2::XMLElement *MDMA::find_element(
+    const tinyxml2::XMLNode &root, const char *id
+) const {
+    tinyxml2::XMLNode *found = find_if(
+        root, [&id](const tinyxml2::XMLNode &node, int) {
+            const tinyxml2::XMLElement *e = node.ToElement();
+            const char *eid = "";
+
+            if (e == nullptr
+            ||  e->QueryStringAttribute("id", &eid) != tinyxml2::XML_SUCCESS) {
+                return false;
+            }
+
+            return eid && id && !strcmp(eid, id);
+        }
+    );
+
+    return found ? found->ToElement() : nullptr;
+}
+
 TidyNode MDMA::find_if(
     const TidyNode root, std::function<bool(const TidyNode &, int)> fun
 ) const {
@@ -808,165 +849,158 @@ TidyNode MDMA::find_if(
     return {};
 }
 
-void MDMA::assemble_framework_body(std::string &body_html) {
-    static constexpr const char *smallest_valid_html5{
-        "<!DOCTYPE html><title>x</title>"
-    };
+void MDMA::install_content(tinyxml2::XMLDocument &doc) const {
+    tinyxml2::XMLElement *root = doc.RootElement();
+    tinyxml2::XMLElement *content = find_element(*root, "MDMA-CONTENT");
 
-    tinyxml2::XMLDocument doc;
+    if (!content) return;
 
-    {
-        // Let's convert HTML to XML.
+    content->DeleteChildren();
 
-        std::string html5(smallest_valid_html5);
-        html5.append(body_html);
+    for (const tinyxml2::XMLDocument &section : sections) {
+        const tinyxml2::XMLElement *root = section.RootElement();
+        tinyxml2::XMLNode *node = root->DeepClone(&doc);
 
-        TidyDoc tdoc_xml = tidyCreate();
-
-        setup(tdoc_xml);
-        tidyOptSetBool(tdoc_xml, TidyXmlOut, yes);
-        tidyParseString(tdoc_xml, html5.c_str());
-
-        TidyNode body_node = tidyGetBody(tdoc_xml);
-
-        tidyBufClear(&htmltidy_buffer);
-        tidyNodeGetText(tdoc_xml, body_node, &htmltidy_buffer);
-        doc.Parse((const char *) htmltidy_buffer.bp, htmltidy_buffer.size);
-
-        tidyRelease(tdoc_xml);
-    }
-
-    tinyxml2::XMLElement *parent = doc.RootElement();
-
-    tinyxml2::XMLNode *content_node = find_if(
-        *parent,
-        [](const tinyxml2::XMLNode &node, int) {
-            const tinyxml2::XMLElement *el = node.ToElement();
-            const char *name = el ? el->Name() : nullptr;
-
-            if (!name || strcasecmp("div", name)) {
-                return false;
-            }
-
-            const char *id = "";
-
-            if (el->QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
-                return false;
-            }
-
-            if (id && !strcasecmp("MDMA-CONTENT", id)) {
-                return true;
-            }
-
-            return false;
-        }
-    );
-
-    tinyxml2::XMLElement *content = (
-        content_node ? content_node->ToElement() : nullptr
-    );
-
-    if (content) {
-        content->DeleteChildren();
-
-        for (const tinyxml2::XMLDocument &section : sections) {
-            const tinyxml2::XMLElement *root = section.RootElement();
-            tinyxml2::XMLNode *node = root->DeepClone(&doc);
-
-            if (node) {
-                content->InsertEndChild(node);
-            }
+        if (node) {
+            content->InsertEndChild(node);
         }
     }
+}
 
-    tinyxml2::XMLNode *agenda_node = find_if(
-        *parent,
-        [](const tinyxml2::XMLNode &node, int) {
-            const tinyxml2::XMLElement *el = node.ToElement();
-            const char *name = el ? el->Name() : nullptr;
+void MDMA::install_agenda(tinyxml2::XMLDocument &doc) const {
+    tinyxml2::XMLElement *root = doc.RootElement();
+    tinyxml2::XMLElement *agenda = find_element(*root, "MDMA-AGENDA");
 
-            if (!name || strcasecmp("div", name)) {
-                return false;
+    if (!agenda) return;
+
+    agenda->DeleteChildren();
+
+    std::map<int, tinyxml2::XMLElement*> groups{{0, agenda}};
+
+    for (const auto &p : headings) {
+        int parent_id = *(std::get<0>(p.second).parent_id);
+        tinyxml2::XMLElement *container = std::prev(groups.end())->second;
+
+        if (groups.count(parent_id)) {
+            container = groups.at(parent_id);
+
+            while (!groups.empty()) {
+                int group_id = std::prev(groups.end())->first;
+
+                if (group_id != parent_id) {
+                    groups.erase(group_id);
+                    continue;
+                }
+
+                break;
             }
-
-            const char *id = "";
-
-            if (el->QueryStringAttribute("id", &id) != tinyxml2::XML_SUCCESS) {
-                return false;
-            }
-
-            if (id && !strcasecmp("MDMA-AGENDA", id)) {
-                return true;
-            }
-
-            return false;
         }
-    );
-
-    tinyxml2::XMLElement *agenda = (
-        agenda_node ? agenda_node->ToElement() : nullptr
-    );
-
-    if (agenda) {
-        agenda->DeleteChildren();
-
-        std::map<int, tinyxml2::XMLElement*> groups{{0, agenda}};
-
-        for (const auto &p : headings) {
-            int parent_id = *(std::get<0>(p.second).parent_id);
-            tinyxml2::XMLElement *container = std::prev(groups.end())->second;
-
-            if (groups.count(parent_id)) {
-                container = groups.at(parent_id);
-
-                while (!groups.empty()) {
-                    int group_id = std::prev(groups.end())->first;
-
-                    if (group_id != parent_id) {
-                        groups.erase(group_id);
-                        continue;
-                    }
-
-                    break;
-                }
-            }
-            else {
-                tinyxml2::XMLNode *node = container->InsertEndChild(
-                    doc.NewElement("div")
-                );
-
-                tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
-
-                if (elem) {
-                    groups.emplace(parent_id, elem);
-                    container = elem;
-                }
-                else die();
-            }
-
+        else {
             tinyxml2::XMLNode *node = container->InsertEndChild(
-                doc.NewElement("a")
+                doc.NewElement("div")
             );
 
             tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
 
             if (elem) {
-                elem->SetAttribute("target", "_self");
-                elem->SetAttribute(
-                    "href",
-                    std::string("#").append(
-                        std::get<0>(p.second).identifier->c_str()
-                    ).c_str()
-                );
-
-                elem->InsertNewText(std::get<0>(p.second).title->c_str());
+                groups.emplace(parent_id, elem);
+                container = elem;
             }
             else die();
         }
+
+        tinyxml2::XMLNode *node = container->InsertEndChild(
+            doc.NewElement("a")
+        );
+
+        tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
+
+        if (elem) {
+            elem->SetAttribute("target", "_self");
+            elem->SetAttribute(
+                "href",
+                std::string("#").append(
+                    std::get<0>(p.second).identifier->c_str()
+                ).c_str()
+            );
+
+            elem->InsertNewText(std::get<0>(p.second).title->c_str());
+        }
+        else die();
     }
+}
+
+void MDMA::install_loader(tinyxml2::XMLDocument &doc) const {
+    tinyxml2::XMLElement *root = doc.RootElement();
+
+    std::vector<tinyxml2::XMLElement *> checkpoints;
 
     find_if(
-        *parent,
+        *root,
+        [&checkpoints](const tinyxml2::XMLNode &node, int node_depth) {
+            const tinyxml2::XMLElement *el = node.ToElement();
+            const char *name = el ? el->Name() : nullptr;
+
+            if (!name) return false;
+
+            bool checkpoint{
+                !strcasecmp("h1",   name) ||
+                !strcasecmp("h2",   name) ||
+                !strcasecmp("h3",   name) ||
+                !strcasecmp("h4",   name) ||
+                !strcasecmp("h5",   name) ||
+                !strcasecmp("h6",   name)
+            };
+
+            if (checkpoint) {
+                checkpoints.emplace_back(
+                    const_cast<tinyxml2::XMLElement *>(el)
+                );
+            }
+
+            return false;
+        }
+    );
+
+    for (size_t i=0; i<checkpoints.size(); ++i) {
+        tinyxml2::XMLElement *el = checkpoints[i];
+        tinyxml2::XMLNode *el_parent = el->Parent();
+
+        tinyxml2::XMLNode *style{
+            el_parent->InsertAfterChild(el, doc.NewElement("style"))
+        };
+
+        tinyxml2::XMLElement *style_el = style ? style->ToElement() : nullptr;
+
+        if (style_el) {
+            style_el->SetAttribute("class", "MDMA-AUTOGENERATED");
+            style_el->SetText(
+                std::string(":root {--MDMA-PAGE-LOADED: ").append(
+                    std::to_string((100*(i+1)) / checkpoints.size())
+                ).append("%;}").c_str()
+            );
+        }
+    }
+
+    tinyxml2::XMLNode *end_style{
+        root->InsertEndChild(doc.NewElement("style"))
+    };
+
+    tinyxml2::XMLElement *style_el{
+        end_style ? end_style->ToElement() : nullptr
+    };
+
+    if (style_el) {
+        style_el->SetAttribute("class", "MDMA-AUTOGENERATED");
+        style_el->SetText(
+            std::string(":root {--MDMA-LOADER-OPACITY: 0%;}").c_str()
+        );
+    }
+}
+
+void MDMA::enhance_tables(tinyxml2::XMLDocument &doc) const {
+    find_if(
+        *doc.RootElement(),
         [](const tinyxml2::XMLNode &node, int) {
             const tinyxml2::XMLElement *el = node.ToElement();
             const char *name = el ? el->Name() : nullptr;
@@ -1003,14 +1037,17 @@ void MDMA::assemble_framework_body(std::string &body_html) {
             return false;
         }
     );
+}
 
-    std::vector<tinyxml2::XMLNode *> video_links;
+void MDMA::enhance_videos(tinyxml2::XMLDocument &doc) const {
     static constexpr const std::string_view video_prefix{
         "https://www.youtube.com/watch?"
     };
 
+    std::vector<tinyxml2::XMLNode *> video_links;
+
     find_if(
-        *parent,
+        *doc.RootElement(),
         [&video_links](const tinyxml2::XMLNode &node, int) {
             const tinyxml2::XMLElement *el = node.ToElement();
             const char *name = el ? el->Name() : nullptr;
@@ -1108,11 +1145,195 @@ void MDMA::assemble_framework_body(std::string &body_html) {
 
         video_links.pop_back();
     }
+}
 
+void MDMA::enhance_image(tinyxml2::XMLElement &el) const {
+    if (!el.Attribute("loading")) {
+        el.SetAttribute("loading", "lazy");
+    }
+
+    const char *src = el.Attribute("src");
+
+    if (!src) return;
+
+    static constexpr const std::string_view
+        data_prefix { "data:"    },
+        http_prefix { "http://"  },
+        https_prefix{ "https://" };
+
+    if (!strncasecmp(src, data_prefix.data(), data_prefix.size())) {
+        return;
+    }
+
+    if (!strncasecmp(src, data_prefix.data(), http_prefix.size())
+    ||  !strncasecmp(src, data_prefix.data(), https_prefix.size())) {
+        // Download the file from the Internet.
+        return;
+    }
+    else if (std::filesystem::exists(directory / src)) {
+        // Load the file from the local storage.
+    }
+    else return;
+
+    if (!el.Attribute("width") && !el.Attribute("height")) {
+        std::filesystem::path path(directory / src);
+        Imlib_Load_Error img_err;
+        Imlib_Image img_src = imlib_load_image_with_error_return(
+            path.c_str(), &img_err
+        );
+
+        if (img_err) {
+            log("%s: error %d when trying to load", path.c_str(), img_err);
+        }
+
+        if (!img_src) {
+            log("Error opening file: %s", src);
+            return;
+        }
+
+        imlib_context_set_image(img_src);
+
+        int src_w = imlib_image_get_width();
+        int src_h = imlib_image_get_height();
+
+        el.SetAttribute("width",  std::to_string(src_w).c_str());
+        el.SetAttribute("height", std::to_string(src_h).c_str());
+
+        int dst_w = src_w / 8;
+        int dst_h = src_h / 8;
+
+        Imlib_Image img_dst{};
+
+        if (dst_w > 0 && dst_h > 0 && !el.Attribute("style")
+        && !imlib_image_has_alpha()) {
+            img_dst = imlib_create_cropped_scaled_image(
+                0, 0, src_w, src_h, dst_w, dst_h
+            );
+        }
+
+        if (img_dst) {
+            const char *src_fmt = imlib_image_format();
+            const char *src_nam = imlib_image_get_filename();
+
+            std::string filename(
+                src_nam ? src_nam : (
+                    std::string("mdma-imgbuf").append(".").append(
+                        src_fmt
+                    ).c_str()
+                )
+            );
+
+            imlib_context_set_image(img_dst);
+            imlib_image_set_format(src_fmt);
+
+            FILE *fptr;
+            int fd, errcode{
+                (
+                    fd = memfd_create(
+                        filename.c_str(), MFD_ALLOW_SEALING
+                    )
+                ) == -1 ? errno : 0
+            };
+
+            if (fd == -1) {
+                log("memfd_create: %s", strerror(errcode));
+            }
+            else if ( (fptr = fdopen(fd, "r")) == nullptr) {
+                errcode = errno;
+                log("fdopen(%d): %s", fd, strerror(errcode));
+            }
+            else {
+                std::string style(
+                    std::string(
+                        "background-size: cover;background-image: url('"
+                    ).append(
+                        "data:image/").append(
+                            !strcasecmp("jpg", src_fmt) ? (
+                                "jpeg"
+                            ) : src_fmt
+                        ).append(
+                        ";base64,"
+                    )
+                );
+
+                size_t dst_fsz = 0;
+                int tmpfd, errcode{(tmpfd = dup(fd)) == -1 ? errno : 0};
+
+                if (tmpfd != -1) {
+                    imlib_save_image_fd(tmpfd, filename.c_str());
+                    fseek(fptr, 0, SEEK_SET);
+
+                    std::array<unsigned char, 4*1024> readbuf;
+                    std::array<char, readbuf.size()*2> base64buf;
+                    ssize_t nb;
+                    base64::base64_encodestate b64e;
+                    base64::base64_init_encodestate(&b64e);
+
+                    do {
+                        nb = read(fd, readbuf.data(), readbuf.size());
+
+                        if (nb == -1) {
+                            log("read(%d): %s", fd, strerror(errno));
+                            style.clear();
+
+                            break;
+                        }
+                        else if (nb == 0) {
+                            style.append(
+                                base64buf.data(),
+                                base64::base64_encode_blockend(
+                                    base64buf.data(), &b64e
+                                )
+                            ).append("');");
+
+                            break;
+                        }
+                        else if (nb > 0) {
+                            style.append(
+                                base64buf.data(),
+                                base64::base64_encode_block(
+                                    (const char *) readbuf.data(),
+                                    int(nb), base64buf.data(), &b64e
+                                )
+                            );
+
+                            dst_fsz += size_t(nb);
+                        }
+                        else die();
+                    } while (nb != 0);
+                }
+                else log("dup(%d): %s", fd, strerror(errcode));
+
+                if (close(fd) == -1) {
+                    errcode = errno;
+                    log("close(%d): %s", fd, strerror(errcode));
+                }
+
+                if (dst_fsz && !style.empty()) {
+                    style.erase(
+                        std::remove_if(
+                            style.begin(), style.end(), ::isspace
+                        ),
+                        style.end()
+                    );
+
+                    el.SetAttribute("style", style.c_str());
+                }
+            }
+
+            imlib_free_image();
+        }
+
+        imlib_context_set_image(img_src);
+        imlib_free_image();
+    }
+}
+
+void MDMA::enhance_images(tinyxml2::XMLDocument &doc) const {
     std::vector<tinyxml2::XMLElement *> images;
 
     find_if(
-        *parent,
+        *doc.RootElement(),
         [&images](const tinyxml2::XMLNode &node, int) {
             const tinyxml2::XMLElement *el = node.ToElement();
             const char *name = el ? el->Name() : nullptr;
@@ -1128,268 +1349,30 @@ void MDMA::assemble_framework_body(std::string &body_html) {
     );
 
     for (tinyxml2::XMLElement *el : images) {
-        if (!el->Attribute("loading")) {
-            el->SetAttribute("loading", "lazy");
-        }
-
-        const char *src = el->Attribute("src");
-
-        static constexpr const std::string_view
-            data_prefix { "data:"    },
-            http_prefix { "http://"  },
-            https_prefix{ "https://" };
-
-        if (src
-        && strncasecmp(src, data_prefix.data(), data_prefix.size())
-        && strncasecmp(src, http_prefix.data(), http_prefix.size())
-        && strncasecmp(src, https_prefix.data(), https_prefix.size())
-        && !el->Attribute("width") && !el->Attribute("height")) {
-            std::filesystem::path path(directory / src);
-            Imlib_Load_Error img_err;
-            Imlib_Image img_src = imlib_load_image_with_error_return(
-                path.c_str(), &img_err
-            );
-
-            if (img_err) {
-                log("%s: error %d when trying to load", path.c_str(), img_err);
-            }
-
-            if (img_src) {
-                imlib_context_set_image(img_src);
-
-                int src_w = imlib_image_get_width();
-                int src_h = imlib_image_get_height();
-
-                el->SetAttribute("width",  std::to_string(src_w).c_str());
-                el->SetAttribute("height", std::to_string(src_h).c_str());
-
-                int dst_w = src_w / 8;
-                int dst_h = src_h / 8;
-
-                Imlib_Image img_dst{};
-
-                if (dst_w > 0 && dst_h > 0 && !el->Attribute("style")
-                && !imlib_image_has_alpha()) {
-                    img_dst = imlib_create_cropped_scaled_image(
-                        0, 0, src_w, src_h, dst_w, dst_h
-                    );
-                }
-
-                if (img_dst) {
-                    const char *src_fmt = imlib_image_format();
-                    const char *src_nam = imlib_image_get_filename();
-
-                    std::string filename(
-                        src_nam ? src_nam : (
-                            std::string("mdma-imgbuf").append(".").append(
-                                src_fmt
-                            ).c_str()
-                        )
-                    );
-
-                    imlib_context_set_image(img_dst);
-                    imlib_image_set_format(src_fmt);
-
-                    FILE *fptr;
-                    int fd, errcode{
-                        (
-                            fd = memfd_create(
-                                filename.c_str(), MFD_ALLOW_SEALING
-                            )
-                        ) == -1 ? errno : 0
-                    };
-
-                    if (fd == -1) {
-                        log("memfd_create: %s", strerror(errcode));
-                    }
-                    else if ( (fptr = fdopen(fd, "r")) == nullptr) {
-                        errcode = errno;
-                        log("fdopen(%d): %s", fd, strerror(errcode));
-                    }
-                    else {
-                        std::string style(
-                            std::string(
-                                "background-size: cover;background-image: url('"
-                            ).append(
-                                "data:image/").append(
-                                    !strcasecmp("jpg", src_fmt) ? (
-                                        "jpeg"
-                                    ) : src_fmt
-                                ).append(
-                                ";base64,"
-                            )
-                        );
-
-                        size_t dst_fsz = 0;
-                        int tmpfd, errcode{(tmpfd = dup(fd)) == -1 ? errno : 0};
-
-                        if (tmpfd != -1) {
-                            imlib_save_image_fd(tmpfd, filename.c_str());
-                            fseek(fptr, 0, SEEK_SET);
-
-                            std::array<unsigned char, 4*1024> readbuf;
-                            std::array<char, readbuf.size()*2> base64buf;
-                            ssize_t nb;
-                            base64::base64_encodestate b64e;
-                            base64::base64_init_encodestate(&b64e);
-
-                            do {
-                                nb = read(fd, readbuf.data(), readbuf.size());
-
-                                if (nb == -1) {
-                                    log("read(%d): %s", fd, strerror(errno));
-                                    style.clear();
-
-                                    break;
-                                }
-                                else if (nb == 0) {
-                                    style.append(
-                                        base64buf.data(),
-                                        base64::base64_encode_blockend(
-                                            base64buf.data(), &b64e
-                                        )
-                                    ).append("');");
-
-                                    break;
-                                }
-                                else if (nb > 0) {
-                                    style.append(
-                                        base64buf.data(),
-                                        base64::base64_encode_block(
-                                            (const char *) readbuf.data(),
-                                            int(nb), base64buf.data(), &b64e
-                                        )
-                                    );
-
-                                    dst_fsz += size_t(nb);
-                                }
-                                else die();
-                            } while (nb != 0);
-                        }
-                        else log("dup(%d): %s", fd, strerror(errcode));
-
-                        if (close(fd) == -1) {
-                            errcode = errno;
-                            log("close(%d): %s", fd, strerror(errcode));
-                        }
-
-                        if (dst_fsz && !style.empty()) {
-                            style.erase(
-                                std::remove_if(
-                                    style.begin(), style.end(), ::isspace
-                                ),
-                                style.end()
-                            );
-
-                            el->SetAttribute("style", style.c_str());
-                        }
-                    }
-
-                    imlib_free_image();
-                }
-
-                imlib_context_set_image(img_src);
-                imlib_free_image();
-            }
-            else {
-                this->log("Error opening file: %s", src);
-                continue;
-            }
-        }
+        enhance_image(*el);
     }
+}
 
-    std::vector<tinyxml2::XMLElement *> checkpoints;
+std::string MDMA::assemble_framework_body(const char *body_html) {
+    tinyxml2::XMLDocument doc;
 
-    find_if(
-        *parent,
-        [&checkpoints](const tinyxml2::XMLNode &node, int node_depth) {
-            const tinyxml2::XMLElement *el = node.ToElement();
-            const char *name = el ? el->Name() : nullptr;
+    html2xml(std::string(smallest_valid_html5).append(body_html), doc);
 
-            if (!name) return false;
+    install_content(doc);
+    install_agenda(doc);
 
-            bool checkpoint{
-                !strcasecmp("h1",   name) ||
-                !strcasecmp("h2",   name) ||
-                !strcasecmp("h3",   name) ||
-                !strcasecmp("h4",   name) ||
-                !strcasecmp("h5",   name) ||
-                !strcasecmp("h6",   name)
-            };
+    enhance_tables(doc);
+    enhance_videos(doc);
+    enhance_images(doc);
 
-            if (checkpoint) {
-                checkpoints.emplace_back(
-                    const_cast<tinyxml2::XMLElement *>(el)
-                );
-            }
-
-            return false;
-        }
-    );
-
-    for (size_t i=0; i<checkpoints.size(); ++i) {
-        tinyxml2::XMLElement *el = checkpoints[i];
-        tinyxml2::XMLNode *el_parent = el->Parent();
-
-        tinyxml2::XMLNode *style{
-            el_parent->InsertAfterChild(el, doc.NewElement("style"))
-        };
-
-        tinyxml2::XMLElement *style_el = style ? style->ToElement() : nullptr;
-
-        if (style_el) {
-            style_el->SetAttribute("class", "MDMA-AUTOGENERATED");
-            style_el->SetText(
-                std::string(":root {--MDMA-PAGE-LOADED: ").append(
-                    std::to_string((100*(i+1)) / checkpoints.size())
-                ).append("%;}").c_str()
-            );
-        }
-    }
-
-    {
-        tinyxml2::XMLNode *end_style{
-            parent->InsertEndChild(doc.NewElement("style"))
-        };
-
-        tinyxml2::XMLElement *style_el{
-            end_style ? end_style->ToElement() : nullptr
-        };
-
-        if (style_el) {
-            style_el->SetAttribute("class", "MDMA-AUTOGENERATED");
-            style_el->SetText(
-                std::string(":root {--MDMA-LOADER-OPACITY: 0%;}").c_str()
-            );
-        }
-    }
+    install_loader(doc);
 
     tinyxml2::XMLPrinter printer(nullptr, true);
     doc.Print(&printer);
 
-    body_html.assign(printer.CStr());
-
-    {
-        // Let's convert XML to HTML.
-
-        std::string html5(smallest_valid_html5);
-        html5.append(body_html);
-
-        TidyDoc tdoc = tidyCreate();
-
-        setup(tdoc);
-        tidyParseString(tdoc, html5.c_str());
-
-        TidyNode body = tidyGetBody(tdoc);
-
-        tidyBufClear(&htmltidy_buffer);
-        tidyNodeGetText(tdoc, body, &htmltidy_buffer);
-        body_html.assign(
-            (const char *) htmltidy_buffer.bp, htmltidy_buffer.size
-        );
-
-        tidyRelease(tdoc);
-    }
+    return xml2html(
+        std::string(smallest_valid_html5).append(printer.CStr()).c_str()
+    );
 }
 
 void MDMA::set_logger(const std::function<void(const char *)>& log_cb) {
@@ -1455,6 +1438,39 @@ std::string MDMA::bin2safe(unsigned char *bytes, size_t len) {
     }
 
     return result;
+}
+
+void MDMA::html2xml(const std::string &html, tinyxml2::XMLDocument &doc) {
+    TidyDoc tdoc_xml = tidyCreate();
+
+    setup(tdoc_xml);
+    tidyOptSetBool(tdoc_xml, TidyXmlOut, yes);
+    tidyParseString(tdoc_xml, html.c_str());
+
+    TidyNode body_node = tidyGetBody(tdoc_xml);
+
+    tidyBufClear(&htmltidy_buffer);
+    tidyNodeGetText(tdoc_xml, body_node, &htmltidy_buffer);
+    doc.Parse((const char *) htmltidy_buffer.bp, htmltidy_buffer.size);
+
+    tidyRelease(tdoc_xml);
+}
+
+std::string MDMA::xml2html(const char *xml) {
+    TidyDoc tdoc = tidyCreate();
+
+    setup(tdoc);
+    tidyParseString(tdoc, xml);
+
+    TidyNode body = tidyGetBody(tdoc);
+
+    tidyBufClear(&htmltidy_buffer);
+    tidyNodeGetText(tdoc, body, &htmltidy_buffer);
+    tidyRelease(tdoc);
+
+    return std::string(
+        (const char *) htmltidy_buffer.bp, htmltidy_buffer.size
+    );
 }
 
 const MDMA::heading_data *MDMA::get_heading_data(int id) const {
