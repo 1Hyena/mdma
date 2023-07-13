@@ -1216,13 +1216,6 @@ void MDMA::enhance_image(tinyxml2::XMLElement &el) {
                 };
 
                 if (!base64.empty()) {
-                    base64.erase(
-                        std::remove_if(
-                            base64.begin(), base64.end(), ::isspace
-                        ),
-                        base64.end()
-                    );
-
                     std::string style(
                         std::string(
                             "background-size: cover;background-image: url('"
@@ -1379,6 +1372,13 @@ std::string MDMA::encode_base64(
     if (written > 0) {
         encoded.append(base64buf.data(), written);
     }
+
+    encoded.erase(
+        std::remove_if(
+            encoded.begin(), encoded.end(), ::isspace
+        ),
+        encoded.end()
+    );
 
     return encoded;
 }
