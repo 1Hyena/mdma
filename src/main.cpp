@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
     MDMA mdma;
     mdma.cfg.minify = options.flags.minify;
     mdma.cfg.github = options.flags.dialect == OPTIONS::DIALECT_GITHUB;
+    mdma.cfg.verbose= options.flags.verbose;
 
     mdma.set_logger(log_text);
 

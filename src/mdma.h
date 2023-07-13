@@ -20,6 +20,8 @@
 #include <filesystem>
 #include <sys/mman.h>
 #include <b64/encode.h>
+#include <b64/decode.h>
+#include <fstream>
 
 class MDMA {
     public:
@@ -33,7 +35,8 @@ class MDMA {
     MDMA() : cfg(
         {
             .github = false,
-            .minify = false
+            .minify = false,
+            .verbose= false
         }
     )
     , directory("")
@@ -50,6 +53,7 @@ class MDMA {
     struct cfg_type {
         bool github:1;
         bool minify:1;
+        bool verbose:1;
     } cfg;
 
     void set_logger(const std::function<void(const char *)>& log_callback);
@@ -96,12 +100,19 @@ class MDMA {
     void install_loader (tinyxml2::XMLDocument &) const;
     void enhance_tables (tinyxml2::XMLDocument &) const;
     void enhance_videos (tinyxml2::XMLDocument &) const;
-    void enhance_images (tinyxml2::XMLDocument &) const;
+    void enhance_images (tinyxml2::XMLDocument &);
 
-    void enhance_image(tinyxml2::XMLElement &element) const;
+    void enhance_image(tinyxml2::XMLElement &element);
 
     void html2xml(const std::string &html, tinyxml2::XMLDocument &xml);
     std::string xml2html(const char *xml);
+
+    std::vector<unsigned char> load_file(const char *);
+    std::vector<unsigned char> decode_base64(const char *);
+    std::vector<unsigned char> decode_base64(const char *, size_t);
+    std::vector<unsigned char> dump_image(const Imlib_Image &) const;
+
+    std::string encode_base64(const unsigned char *, size_t);
 
     static std::string bin2safe(unsigned char *bytes, size_t len);
 
@@ -1147,7 +1158,7 @@ void MDMA::enhance_videos(tinyxml2::XMLDocument &doc) const {
     }
 }
 
-void MDMA::enhance_image(tinyxml2::XMLElement &el) const {
+void MDMA::enhance_image(tinyxml2::XMLElement &el) {
     if (!el.Attribute("loading")) {
         el.SetAttribute("loading", "lazy");
     }
@@ -1156,180 +1167,86 @@ void MDMA::enhance_image(tinyxml2::XMLElement &el) const {
 
     if (!src) return;
 
-    static constexpr const std::string_view
-        data_prefix { "data:"    },
-        http_prefix { "http://"  },
-        https_prefix{ "https://" };
+    std::vector<unsigned char> rawsrc{ load_file(src) };
 
-    if (!strncasecmp(src, data_prefix.data(), data_prefix.size())) {
+    if (rawsrc.empty()) {
         return;
     }
 
-    if (!strncasecmp(src, data_prefix.data(), http_prefix.size())
-    ||  !strncasecmp(src, data_prefix.data(), https_prefix.size())) {
-        // Download the file from the Internet.
+    Imlib_Image img_src{
+        imlib_load_image_mem("memimg", rawsrc.data(), rawsrc.size())
+    };
+
+    if (!img_src) {
+        log("Error loading image: %.50s", src);
         return;
     }
-    else if (std::filesystem::exists(directory / src)) {
-        // Load the file from the local storage.
-    }
-    else return;
 
-    if (!el.Attribute("width") && !el.Attribute("height")) {
-        std::filesystem::path path(directory / src);
-        Imlib_Load_Error img_err;
-        Imlib_Image img_src = imlib_load_image_with_error_return(
-            path.c_str(), &img_err
-        );
+    imlib_context_set_image(img_src);
 
-        if (img_err) {
-            log("%s: error %d when trying to load", path.c_str(), img_err);
-        }
+    int src_w = imlib_image_get_width();
+    int src_h = imlib_image_get_height();
 
-        if (!img_src) {
-            log("Error opening file: %s", src);
-            return;
-        }
+    el.SetAttribute("width",  std::to_string(src_w).c_str());
+    el.SetAttribute("height", std::to_string(src_h).c_str());
 
-        imlib_context_set_image(img_src);
+    int dst_w = src_w / 8;
+    int dst_h = src_h / 8;
 
-        int src_w = imlib_image_get_width();
-        int src_h = imlib_image_get_height();
-
-        el.SetAttribute("width",  std::to_string(src_w).c_str());
-        el.SetAttribute("height", std::to_string(src_h).c_str());
-
-        int dst_w = src_w / 8;
-        int dst_h = src_h / 8;
-
-        Imlib_Image img_dst{};
-
-        if (dst_w > 0 && dst_h > 0 && !el.Attribute("style")
-        && !imlib_image_has_alpha()) {
-            img_dst = imlib_create_cropped_scaled_image(
-                0, 0, src_w, src_h, dst_w, dst_h
-            );
-        }
+    if (dst_w > 0 && dst_h > 0
+    && !el.Attribute("style") && !imlib_image_has_alpha()) {
+        Imlib_Image img_dst{
+            imlib_create_cropped_scaled_image(0, 0, src_w, src_h, dst_w, dst_h)
+        };
 
         if (img_dst) {
             const char *src_fmt = imlib_image_format();
-            const char *src_nam = imlib_image_get_filename();
-
-            std::string filename(
-                src_nam ? src_nam : (
-                    std::string("mdma-imgbuf").append(".").append(
-                        src_fmt
-                    ).c_str()
-                )
-            );
 
             imlib_context_set_image(img_dst);
             imlib_image_set_format(src_fmt);
 
-            FILE *fptr;
-            int fd, errcode{
-                (
-                    fd = memfd_create(
-                        filename.c_str(), MFD_ALLOW_SEALING
-                    )
-                ) == -1 ? errno : 0
-            };
+            std::vector<unsigned char> rawdst{ dump_image(img_dst) };
 
-            if (fd == -1) {
-                log("memfd_create: %s", strerror(errcode));
-            }
-            else if ( (fptr = fdopen(fd, "r")) == nullptr) {
-                errcode = errno;
-                log("fdopen(%d): %s", fd, strerror(errcode));
-            }
-            else {
-                std::string style(
-                    std::string(
-                        "background-size: cover;background-image: url('"
-                    ).append(
-                        "data:image/").append(
-                            !strcasecmp("jpg", src_fmt) ? (
-                                "jpeg"
-                            ) : src_fmt
-                        ).append(
-                        ";base64,"
-                    )
-                );
+            imlib_context_set_image(img_dst);
+            imlib_free_image();
 
-                size_t dst_fsz = 0;
-                int tmpfd, errcode{(tmpfd = dup(fd)) == -1 ? errno : 0};
+            if (!rawdst.empty()) {
+                std::string base64{
+                    encode_base64(rawdst.data(), rawdst.size())
+                };
 
-                if (tmpfd != -1) {
-                    imlib_save_image_fd(tmpfd, filename.c_str());
-                    fseek(fptr, 0, SEEK_SET);
-
-                    std::array<unsigned char, 4*1024> readbuf;
-                    std::array<char, readbuf.size()*2> base64buf;
-                    ssize_t nb;
-                    base64::base64_encodestate b64e;
-                    base64::base64_init_encodestate(&b64e);
-
-                    do {
-                        nb = read(fd, readbuf.data(), readbuf.size());
-
-                        if (nb == -1) {
-                            log("read(%d): %s", fd, strerror(errno));
-                            style.clear();
-
-                            break;
-                        }
-                        else if (nb == 0) {
-                            style.append(
-                                base64buf.data(),
-                                base64::base64_encode_blockend(
-                                    base64buf.data(), &b64e
-                                )
-                            ).append("');");
-
-                            break;
-                        }
-                        else if (nb > 0) {
-                            style.append(
-                                base64buf.data(),
-                                base64::base64_encode_block(
-                                    (const char *) readbuf.data(),
-                                    int(nb), base64buf.data(), &b64e
-                                )
-                            );
-
-                            dst_fsz += size_t(nb);
-                        }
-                        else die();
-                    } while (nb != 0);
-                }
-                else log("dup(%d): %s", fd, strerror(errcode));
-
-                if (close(fd) == -1) {
-                    errcode = errno;
-                    log("close(%d): %s", fd, strerror(errcode));
-                }
-
-                if (dst_fsz && !style.empty()) {
-                    style.erase(
+                if (!base64.empty()) {
+                    base64.erase(
                         std::remove_if(
-                            style.begin(), style.end(), ::isspace
+                            base64.begin(), base64.end(), ::isspace
                         ),
-                        style.end()
+                        base64.end()
+                    );
+
+                    std::string style(
+                        std::string(
+                            "background-size: cover;background-image: url('"
+                        ).append(
+                            "data:image/").append(
+                                !strcasecmp("jpg", src_fmt) ? (
+                                    "jpeg"
+                                ) : src_fmt
+                            ).append(
+                            ";base64,"
+                        ).append(base64).append("');")
                     );
 
                     el.SetAttribute("style", style.c_str());
                 }
             }
-
-            imlib_free_image();
         }
-
-        imlib_context_set_image(img_src);
-        imlib_free_image();
     }
+
+    imlib_context_set_image(img_src);
+    imlib_free_image();
 }
 
-void MDMA::enhance_images(tinyxml2::XMLDocument &doc) const {
+void MDMA::enhance_images(tinyxml2::XMLDocument &doc) {
     std::vector<tinyxml2::XMLElement *> images;
 
     find_if(
@@ -1440,6 +1357,57 @@ std::string MDMA::bin2safe(unsigned char *bytes, size_t len) {
     return result;
 }
 
+std::string MDMA::encode_base64(
+    const unsigned char *bytes, size_t len
+) {
+    if (std::numeric_limits<int>::max() < len) die();
+
+    std::vector<char> base64buf(2*len+4);
+    base64::base64_encodestate b64e;
+    base64::base64_init_encodestate(&b64e);
+
+    int written = base64::base64_encode_block(
+        (const char *) bytes, int(len), base64buf.data(), &b64e
+    );
+
+    if (written < 0) die();
+
+    std::string encoded(base64buf.data(), written);
+
+    written = base64::base64_encode_blockend(base64buf.data(), &b64e);
+
+    if (written > 0) {
+        encoded.append(base64buf.data(), written);
+    }
+
+    return encoded;
+}
+
+std::vector<unsigned char> MDMA::decode_base64(const char *str, size_t len) {
+    if (len > std::numeric_limits<int>::max()) die();
+
+    size_t decoded_maxlen = len / 4 * 3 + 2;
+
+    base64::base64_decodestate b64d;
+    base64::base64_init_decodestate(&b64d);
+
+    std::vector<unsigned char> decoded(decoded_maxlen);
+
+    int decoded_len{
+        base64::base64_decode_block(
+            str, int(len), (char *) decoded.data(), &b64d
+        )
+    };
+
+    decoded[decoded_len] = 0;
+
+    return decoded;
+}
+
+std::vector<unsigned char> MDMA::decode_base64(const char *str) {
+    return decode_base64(str, strlen(str));
+}
+
 void MDMA::html2xml(const std::string &html, tinyxml2::XMLDocument &doc) {
     TidyDoc tdoc_xml = tidyCreate();
 
@@ -1512,6 +1480,126 @@ std::string MDMA::uri_param_value(const char *uri_str, const char *key) {
     uriFreeUriMembersA(&uri);
 
     return result;
+}
+
+std::vector<unsigned char> MDMA::load_file(const char *src) {
+    static constexpr struct prefix_type{
+        const std::string_view data;
+        const std::string_view http;
+        const std::string_view https;
+    } prefixes{
+        .data { "data:"    },
+        .http { "http://"  },
+        .https{ "https://" }
+    };
+
+    if (cfg.verbose) {
+        log("Loading %.50s\u2026", src);
+    }
+
+    if (!strncasecmp(src, prefixes.data.data(), prefixes.data.size())) {
+        for (char c = *src; c; c = *(++src)) {
+            if (c != ',') continue;
+
+            return decode_base64(++src);
+        }
+
+        return std::vector<unsigned char>{};
+    }
+
+    if (!strncasecmp(src, prefixes.http.data(),  prefixes.http.size())
+    ||  !strncasecmp(src, prefixes.https.data(), prefixes.https.size())) {
+        // Download the file from the Internet.
+        std::vector<unsigned char> file;
+
+        return file;
+    }
+
+    std::filesystem::path path(directory / src);
+
+    if (!std::filesystem::exists(path)) {
+        return {};
+    }
+
+    // Load the file from the local storage.
+    std::ifstream input(path.string(), std::ios::binary);
+    int errcode = errno;
+
+    if (!input) {
+        log("%s: %s", path.c_str(), strerror(errcode));
+        return {};
+    }
+
+    std::stringstream sstr;
+
+    input >> sstr.rdbuf();
+
+    const std::string_view view{sstr.view()};
+
+    return std::vector<unsigned char>(&view.front(), &view.back());
+}
+
+std::vector<unsigned char> MDMA::dump_image(const Imlib_Image &image) const {
+    imlib_context_set_image(image);
+
+    const char *filename = imlib_image_get_filename();
+
+    if (!filename) filename = "memimg";
+
+    int fd, errcode_1{
+        (
+            fd = memfd_create(filename, MFD_ALLOW_SEALING)
+        ) == -1 ? errno : 0
+    };
+
+    if (fd == -1) {
+        log("memfd_create: %s", strerror(errcode_1));
+        return {};
+    }
+
+    std::vector<unsigned char> rawimg;
+
+    int tmpfd, errcode_2{(tmpfd = dup(fd)) == -1 ? errno : 0};
+
+    if (tmpfd == -1) {
+        log("dup(%d): %s", fd, strerror(errcode_2));
+    }
+    else {
+        imlib_save_image_fd(tmpfd, filename);
+        lseek(fd, 0, SEEK_SET);
+
+        std::array<unsigned char, 8*1024> readbuf;
+        ssize_t nb;
+
+        do {
+            nb = read(fd, readbuf.data(), readbuf.size());
+
+            if (nb == -1) {
+                log("read(%d): %s", fd, strerror(errno));
+                rawimg.clear();
+
+                break;
+            }
+            else if (nb == 0) {
+                break;
+            }
+            else if (nb > 0) {
+                rawimg.insert(
+                    rawimg.end(),
+                    (const unsigned char *) (readbuf.data()),
+                    (const unsigned char *) (readbuf.data() + nb)
+                );
+            }
+            else die();
+        } while (nb != 0);
+    }
+
+    if (close(fd) == -1) {
+        int errcode = errno;
+        log("close(%d): %s", fd, strerror(errcode));
+    }
+
+    return rawimg;
 }
 
 #endif
