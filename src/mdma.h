@@ -34,6 +34,7 @@ class MDMA {
 
     MDMA() : cfg(
         {
+            .preview= 0,
             .github = false,
             .minify = false,
             .verbose= false
@@ -51,6 +52,7 @@ class MDMA {
     }
 
     struct cfg_type {
+        uint8_t preview;
         bool github:1;
         bool minify:1;
         bool verbose:1;
@@ -66,13 +68,19 @@ class MDMA {
     static std::string uri_param_value(const char *uri, const char *key);
 
     private:
+    struct heading_data {
+        int *parent_id;
+        std::string *title;
+        std::string *identifier;
+    };
+
     void bug(const char * =__builtin_FILE(), int =__builtin_LINE()) const;
     void log(const char *fmt, ...) const __attribute__((format(printf, 2, 3)));
     void die(const char * =__builtin_FILE(), int =__builtin_LINE()) const;
 
     bool deflate_framework(TidyDoc framework);
     bool parse_markdown(const char *str, size_t len);
-    bool inflate_framework(TidyDoc framework);
+    bool inflate_framework(const TidyDoc framework);
 
     void add_heading(
         int id, int level, const char *title, std::map<int, int> &level_to_id
@@ -93,39 +101,45 @@ class MDMA {
         const tinyxml2::XMLNode &root, const char *id
     ) const;
 
-    std::string assemble_framework_body(const char *body_html);
-    std::string generate_framework_style() const;
+    void patch_tables(tinyxml2::XMLDocument &) const;
+    void embed_videos(tinyxml2::XMLDocument &) const;
 
-    void install_content(tinyxml2::XMLDocument &) const;
-    void install_agenda (tinyxml2::XMLDocument &) const;
-    void install_loader (tinyxml2::XMLDocument &) const;
-    void enhance_tables (tinyxml2::XMLDocument &) const;
-    void enhance_videos (tinyxml2::XMLDocument &) const;
     void enhance_images (tinyxml2::XMLDocument &);
 
     void enhance_image(tinyxml2::XMLElement &element);
 
-    void html2xml(
-        const std::string &html, tinyxml2::XMLDocument &xml,
-        const TidyTagId =TidyTag_HTML
-    );
-
-    std::string xml2html(const char *xml, const TidyTagId =TidyTag_HTML);
-
     std::vector<unsigned char> load_file(const char *);
     std::vector<unsigned char> decode_base64(const char *);
     std::vector<unsigned char> decode_base64(const char *, size_t);
-    std::vector<unsigned char> dump_image(const Imlib_Image &) const;
+    std::vector<unsigned char> dump(const Imlib_Image &) const;
+
+    std::string dump_inflated(const TidyDoc framework);
+    std::string dump_enhanced(const std::string &html);
+    std::string dump_repaired(const std::string &html);
+    std::string dump(const std::list<tinyxml2::XMLDocument> &) const;
+    std::string dump_agenda(
+        const std::map<
+            int, std::tuple<heading_data, int, std::string, std::string>
+        > &headings
+    ) const;
+    std::string dump_style(
+        const std::map<
+            int, std::tuple<heading_data, int, std::string, std::string>
+        > &headings
+    ) const;
+    std::string dump(
+        const TidyDoc, const TidyNode,
+        std::function<
+            void(const TidyNode &, std::string &)
+        > val_cb =[](const TidyNode &, std::string &) {},
+        std::function<
+            void(const TidyNode &, const TidyAttr &, std::string &)
+        > attr_cb =[](const TidyNode &, const TidyAttr &, std::string &) {}
+    ) const;
 
     std::string encode_base64(const unsigned char *, size_t);
 
     static std::string bin2safe(unsigned char *bytes, size_t len);
-
-    struct heading_data {
-        int *parent_id;
-        std::string *title;
-        std::string *identifier;
-    };
 
     const heading_data *get_heading_data(int id) const;
 
@@ -156,7 +170,6 @@ const std::string *MDMA::assemble(
 
     assembly_buffer.assign(html, html_len);
     identifiers.clear();
-    sections.clear();
 
     {
         TidyDoc tdoc = tidyCreate();
@@ -330,6 +343,7 @@ bool MDMA::parse_markdown(const char *md, size_t md_len) {
     std::map<int, int> level_to_id;
 
     headings.clear();
+    sections.clear();
 
     for (; sibling; sibling = sibling->NextSibling()) {
         const tinyxml2::XMLElement *sibling_element = sibling->ToElement();
@@ -454,140 +468,539 @@ bool MDMA::parse_markdown(const char *md, size_t md_len) {
         }
     }
 
+    for (tinyxml2::XMLDocument &section : sections) {
+        patch_tables(section);
+        embed_videos(section);
+    }
+
     return true;
 }
 
+bool MDMA::inflate_framework(const TidyDoc framework) {
+    dump_inflated(framework).swap(assembly_buffer);
+    dump_enhanced(assembly_buffer).swap(assembly_buffer);
+    dump_repaired(assembly_buffer).swap(assembly_buffer);
 
-bool MDMA::inflate_framework(TidyDoc framework) {
-    assembly_buffer.clear();
+    return true;
+}
 
-    std::map<int, std::string, std::greater<int>> end_tags;
+std::string MDMA::dump_inflated(const TidyDoc framework) {
+    return dump(
+        framework, tidyGetRoot(framework),
+        [&](const TidyNode &node, std::string &value) {
+            if (tidyNodeGetId(node) == TidyTag_HEAD) {
+                std::string buf(
+                    std::string(
+                        "<meta name=\"generator\" content=\""
+                    ).append(MDMA::CAPTION).append(" version ").append(
+                        MDMA::VERSION
+                    ).append("\">").append(value)
+                );
 
-    find_if(
-        tidyGetRoot(framework),
-        [&](const TidyNode &node, int depth) {
-            while (!end_tags.empty()) {
-                int d = end_tags.begin()->first;
+                buf.append(
+                    "<style class=\"MDMA-AUTOGENERATED\">"
+                ).append(dump_style(headings)).append("</style>");
 
-                if (depth <= d) {
-                    assembly_buffer.append(end_tags.begin()->second);
-                    end_tags.erase(d);
-                }
-                else break;
+                value.swap(buf);
+
+                return;
             }
 
-            switch (depth) {
-                case 1: {
-                    if (tidyNodeGetId(node) != TidyTag_HTML) {
-                        tidyBufClear(&htmltidy_buffer);
-                        tidyNodeGetText(framework, node, &htmltidy_buffer);
-                        assembly_buffer.append(
-                            (const char *) htmltidy_buffer.bp,
-                            htmltidy_buffer.size
-                        );
-                    }
-                    else {
-                        assembly_buffer.append("<html>\n");
-                        end_tags[depth].append("</html>\n");
-                    }
+            const char *attr_val{
+                tidyAttrValue(tidyAttrGetById(node, TidyAttr_ID))
+            };
 
-                    break;
-                }
-                case 2: {
-                    TidyNode parent = tidyGetParent(node);
-
-                    if (tidyNodeGetId(parent) != TidyTag_HTML) {
-                        break;
-                    }
-
-                    if (tidyNodeGetId(node) == TidyTag_HEAD) {
-                        assembly_buffer.append("<head>\n");
-
-                        assembly_buffer.append(
-                            "<meta name=\"generator\" content=\""
-                        ).append(MDMA::CAPTION).append(" version ").append(
-                            MDMA::VERSION
-                        ).append("\">\n");
-
-                        if (!headings.empty()) {
-                            end_tags[depth].append(
-                                "<style class=\"MDMA-AUTOGENERATED\">\n"
-                            ).append(
-                                generate_framework_style()
-                            ).append("</style>\n");
-                        }
-
-                        end_tags[depth].append("</head>\n");
-                    }
-                    else if (tidyNodeGetId(node) == TidyTag_BODY) {
-                        tidyBufClear(&htmltidy_buffer);
-                        tidyNodeGetText(framework, node, &htmltidy_buffer);
-
-                        assembly_buffer.append(
-                            assemble_framework_body(
-                                std::string(
-                                    (const char *) htmltidy_buffer.bp,
-                                    htmltidy_buffer.size
-                                ).c_str()
-                            )
-                        );
-                    }
-                    else {
-                        tidyBufClear(&htmltidy_buffer);
-                        tidyNodeGetText(framework, node, &htmltidy_buffer);
-                        assembly_buffer.append(
-                            (const char *) htmltidy_buffer.bp,
-                            htmltidy_buffer.size
-                        );
-                    }
-
-                    break;
-                }
-                case 3: {
-                    TidyNode parent = tidyGetParent(node);
-
-                    if (tidyNodeGetId(parent) != TidyTag_HEAD) {
-                        break;
-                    }
-
-                    tidyBufClear(&htmltidy_buffer);
-                    tidyNodeGetText(framework, node, &htmltidy_buffer);
-                    assembly_buffer.append(
-                        (const char *) htmltidy_buffer.bp,
-                        htmltidy_buffer.size
-                    );
-
-                    break;
-                }
-                default: break;
+            if (!attr_val) {
+                return;
             }
 
-            return false;
+            if (!strcmp("MDMA-CONTENT", attr_val)) {
+                dump(sections).swap(value);
+            }
+            else if (!strcmp("MDMA-AGENDA", attr_val)) {
+                dump_agenda(headings).swap(value);
+            }
+
+            return;
         }
     );
+}
 
-    for (const auto &p : end_tags) {
-        assembly_buffer.append(p.second);
-    }
+std::string MDMA::dump_enhanced(const std::string &html) {
+    size_t heading_counter = 0;
+    TidyDoc doc = tidyCreate();
 
-    if (!cfg.minify) {
-        tidyOptSetInt(framework, TidyIndentContent, yes);
-        tidyOptSetInt(framework, TidyIndentSpaces, 2);
-        tidyOptSetInt(framework, TidyVertSpace, yes);
-        tidyOptSetInt(framework, TidyWrapLen, 68);
-    }
+    setup(doc);
+    tidyOptSetValue(
+        doc, TidyMuteReports,
+        std::string(tidyOptGetValue(doc, TidyMuteReports)).append(
+            ",DISCARDING_UNEXPECTED"
+        ).c_str()
+    );
+    tidyParseString(doc, html.c_str());
 
-    tidyParseString(framework, assembly_buffer.c_str());
-    tidyCleanAndRepair(framework);
+    std::string enhanced{
+        dump(
+            doc, tidyGetRoot(doc),
+            [&](const TidyNode &node, std::string &value) {
+                if (tidyNodeGetId(node) == TidyTag_A
+                &&  tidyNodeIsHeader(tidyGetParent(node))) {
+                    value.append(
+                        "<style class=\"MDMA-AUTOGENERATED\">:root {"
+                        "--MDMA-PAGE-LOADED: "
+                    ).append(
+                        std::to_string(
+                            (100*(++heading_counter)) / headings.size()
+                        )
+                    ).append("%;}</style>");
+                }
+                else if (tidyNodeGetId(node) == TidyTag_BODY) {
+                    value.append(
+                        "<style class=\"MDMA-AUTOGENERATED\">:root {"
+                        "--MDMA-LOADER-OPACITY: 0%;}</style>"
+                    );
+                }
 
-    tidyBufClear(&htmltidy_buffer);
-    tidySaveBuffer(framework, &htmltidy_buffer);
-    assembly_buffer.assign(
-        (const char *) htmltidy_buffer.bp, htmltidy_buffer.size
+                return;
+            },
+            [&](const TidyNode &node, const TidyAttr &attr, std::string &val) {
+                if (tidyNodeGetId(node) == TidyTag_IMG) {
+                    switch (tidyAttrGetId(attr)) {
+                        case TidyAttr_SRC: {
+                            if (val.size() > 0 && val.at(0) != '\0') {
+                                load_file(val.c_str());
+                            }
+
+                            break;
+                        }
+                        default: break;
+                    }
+                }
+            }
+        )
+    };
+
+    tidyRelease(doc);
+
+    return enhanced;
+}
+
+std::string MDMA::dump_repaired(const std::string &html) {
+    TidyDoc doc = tidyCreate();
+
+    setup(doc);
+    tidyOptSetValue(
+        doc, TidyMuteReports,
+        std::string(tidyOptGetValue(doc, TidyMuteReports)).append(
+            ",DISCARDING_UNEXPECTED"
+        ).c_str()
     );
 
-    return true;
+    if (!cfg.minify) {
+        tidyOptSetInt(doc, TidyIndentContent, yes);
+        tidyOptSetInt(doc, TidyIndentSpaces, 2);
+        tidyOptSetInt(doc, TidyVertSpace, yes);
+        tidyOptSetInt(doc, TidyWrapLen, 68);
+    }
+
+    tidyParseString(doc, html.c_str());
+    tidyCleanAndRepair(doc);
+
+    tidyBufClear(&htmltidy_buffer);
+    tidySaveBuffer(doc, &htmltidy_buffer);
+
+    tidyRelease(doc);
+
+    return std::string((const char *) htmltidy_buffer.bp, htmltidy_buffer.size);
 }
+
+std::string MDMA::dump(
+    const TidyDoc doc, const TidyNode parent,
+    std::function<void(const TidyNode &, std::string &)> val_cb,
+    std::function<
+        void(const TidyNode &, const TidyAttr &, std::string &)
+    > attr_cb
+) const {
+    std::string result;
+	TidyAttr attr;
+	TidyNode child;
+    ctmbstr name;
+
+    for (child = tidyGetChild(parent); child; child = tidyGetNext(child)) {
+	    TidyNodeType node_type = tidyNodeGetType(child);
+
+        switch (node_type) {
+            case TidyNode_Start:
+            case TidyNode_StartEnd: {
+                if ((name = tidyNodeGetName(child)) == nullptr) {
+                    break;
+                }
+
+                result.append("<").append((const char *) name);
+
+                attr = tidyAttrFirst(child);
+
+                tinyxml2::XMLPrinter printer(nullptr, true);
+
+                std::string valbuf;
+
+                for (; attr; attr = tidyAttrNext(attr)) {
+                    valbuf.assign(1, '\0');
+
+                    if (!tidyAttrValue(attr)) {
+                        attr_cb(child, attr, valbuf);
+
+                        if (valbuf.size() == 1 && valbuf.at(0) == '\0') {
+                            result.append(" ").append(tidyAttrName(attr));
+                        }
+                        else {
+                            printer.PushAttribute(
+                                tidyAttrName(attr), valbuf.c_str()
+                            );
+                        }
+
+                        continue;
+                    }
+
+                    valbuf.assign(tidyAttrValue(attr));
+
+                    attr_cb(child, attr, valbuf);
+
+                    if (valbuf.size() == 1 && valbuf.at(0) == '\0') {
+                        result.append(" ").append(tidyAttrName(attr));
+                        continue;
+                    }
+
+                    printer.PushAttribute(
+                        tidyAttrName(attr), valbuf.c_str()
+                    );
+                }
+
+                result.append(printer.CStr());
+
+                if (node_type == TidyNode_StartEnd) {
+                    result.append("></").append(name).append(">");
+                }
+                else {
+                    std::string val{dump(doc, child, val_cb, attr_cb)};
+
+                    val_cb(child, val);
+
+                    result.append(">").append(val).append(
+                        "</"
+                    ).append(name).append(">");
+                }
+
+                break;
+            }
+            case TidyNode_End: {
+                if ((name = tidyNodeGetName(child)) == nullptr) {
+                    break;
+                }
+
+                result.append("</").append(name).append(">");
+
+                break;
+            }
+            case TidyNode_Text: {
+                TidyTagId parent_node_id = tidyNodeGetId(parent);
+                TidyBuffer buf;
+
+                tidyBufInit(&buf);
+                tidyNodeGetValue(doc, child, &buf);
+
+                if (buf.bp) {
+                    if (parent_node_id == TidyTag_SCRIPT
+                    ||  parent_node_id == TidyTag_STYLE) {
+                        result.append((const char *) buf.bp, buf.size);
+                    }
+                    else {
+                        tinyxml2::XMLPrinter printer(nullptr, true);
+                        printer.PushText((const char *) buf.bp);
+                        result.append(printer.CStr());
+                    }
+                }
+
+                tidyBufFree(&buf);
+
+                break;
+            }
+            case TidyNode_Comment: {
+                TidyBuffer buf;
+                tidyBufInit(&buf);
+
+                tidyNodeGetValue(doc, child, &buf);
+
+                if (buf.bp) {
+                    result.append("<!--").append(
+                        (const char *) buf.bp, buf.size
+                    ).append("-->");
+                }
+
+                tidyBufFree(&buf);
+
+                break;
+            }
+            case TidyNode_CDATA: {
+                TidyBuffer buf;
+                tidyBufInit(&buf);
+                tidyNodeGetValue(doc, child, &buf);
+
+                if (buf.bp) {
+                    result.append("<![CDATA[").append(
+                        (const char *) buf.bp, buf.size
+                    ).append("]]>");
+                }
+
+                tidyBufFree(&buf);
+                break;
+            }
+            case TidyNode_DocType: {
+                result.append("<!DOCTYPE ").append(tidyNodeGetName(child));
+
+                attr = tidyAttrFirst(child);
+
+                tinyxml2::XMLPrinter printer(nullptr, true);
+
+                std::string valbuf;
+
+                for (; attr; attr = tidyAttrNext(attr)) {
+                    valbuf.assign(1, '\0');
+
+                    if (!tidyAttrValue(attr)) {
+                        attr_cb(child, attr, valbuf);
+
+                        if (valbuf.size() == 1 && valbuf.at(0) == '\0') {
+                            result.append(" ").append(tidyAttrName(attr));
+                        }
+                        else {
+                            printer.PushAttribute(
+                                tidyAttrName(attr), valbuf.c_str()
+                            );
+                        }
+
+                        continue;
+                    }
+
+                    valbuf.assign(tidyAttrValue(attr));
+
+                    attr_cb(child, attr, valbuf);
+
+                    if (valbuf.size() == 1 && valbuf.at(0) == '\0') {
+                        result.append(" ").append(tidyAttrName(attr));
+                        continue;
+                    }
+
+                    printer.PushAttribute(
+                        tidyAttrName(attr), valbuf.c_str()
+                    );
+                }
+
+                result.append(printer.CStr()).append(">");
+
+                break;
+            }
+            default: {
+                TidyBuffer buf;
+                tidyBufInit(&buf);
+                tidyNodeGetValue(doc, child, &buf);
+
+                if (buf.bp) {
+                    result.append((const char *) buf.bp, buf.size);
+                }
+
+                tidyBufFree(&buf);
+
+                break;
+            }
+        }
+    }
+
+    return result;
+}
+
+std::string MDMA::dump_agenda(
+    const std::map<
+        int, std::tuple<heading_data, int, std::string, std::string>
+    > &headings
+) const {
+    tinyxml2::XMLDocument doc;
+
+    doc.InsertFirstChild(doc.NewElement("div"));
+
+    std::map<int, tinyxml2::XMLElement*> groups{{0, doc.RootElement()}};
+
+    for (const auto &p : headings) {
+        int parent_id = *(std::get<0>(p.second).parent_id);
+        tinyxml2::XMLElement *container = std::prev(groups.end())->second;
+
+        if (groups.count(parent_id)) {
+            container = groups.at(parent_id);
+
+            while (!groups.empty()) {
+                int group_id = std::prev(groups.end())->first;
+
+                if (group_id != parent_id) {
+                    groups.erase(group_id);
+                    continue;
+                }
+
+                break;
+            }
+        }
+        else {
+            tinyxml2::XMLNode *node = container->InsertEndChild(
+                doc.NewElement("div")
+            );
+
+            tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
+
+            if (elem) {
+                groups.emplace(parent_id, elem);
+                container = elem;
+            }
+            else die();
+        }
+
+        tinyxml2::XMLNode *node = container->InsertEndChild(
+            doc.NewElement("a")
+        );
+
+        tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
+
+        if (elem) {
+            elem->SetAttribute("target", "_self");
+            elem->SetAttribute(
+                "href",
+                std::string("#").append(
+                    std::get<0>(p.second).identifier->c_str()
+                ).c_str()
+            );
+
+            elem->InsertNewText(std::get<0>(p.second).title->c_str());
+        }
+        else die();
+    }
+
+    tinyxml2::XMLPrinter printer(nullptr, true);
+    doc.Print(&printer);
+
+    return std::string(printer.CStr());
+}
+
+std::string MDMA::dump_style(
+    const std::map<
+        int, std::tuple<heading_data, int, std::string, std::string>
+    > &headings
+) const {
+    std::string agenda_css{
+        ":root {--MDMA-LOADER-OPACITY: 100%; --MDMA-PAGE-LOADED: 0%;}\n"
+    };
+
+    size_t heading_counter = 0;
+    std::map<int, std::vector<int>> heading_to_descendants;
+
+    for (const auto &p : headings) {
+        int parent_id = *(std::get<0>(p.second).parent_id);
+
+        if (parent_id) {
+            heading_to_descendants[parent_id].emplace_back(p.first);
+        }
+
+        std::string *anchor_id = std::get<0>(p.second).identifier;
+
+        ++heading_counter;
+
+        agenda_css.append("body:has(#").append(*anchor_id).append(
+            ":target) #MDMA-AGENDA a[href=\"#"
+        ).append(*anchor_id).append("\"]");
+
+        if (heading_counter == headings.size()) {
+            agenda_css.append(" {\n").append(
+                "    color: var(--MDMA-AGENDA-TARGET-COLOR);\n}\n"
+            );
+        }
+        else {
+            agenda_css.append(",\n");
+        }
+    }
+
+    for (auto &p : heading_to_descendants) {
+        std::vector<int> &descendants = p.second;
+
+        for (size_t i=0; i<descendants.size(); ++i) {
+            int descendant_id = descendants[i];
+
+            if (heading_to_descendants.count(descendant_id)) {
+                for (int id : heading_to_descendants[descendant_id]) {
+                    descendants.emplace_back(id);
+                }
+            }
+        }
+    }
+
+    while (!heading_to_descendants.empty()) {
+        int heading_id = heading_to_descendants.begin()->first;
+        std::vector<int> &descendants = heading_to_descendants.at(heading_id);
+
+        if (!get_heading_data(heading_id)) die();
+
+        agenda_css.append("body:not(\n");
+        agenda_css.append("    :has(#").append(
+            *(get_heading_data(heading_id)->identifier)
+        ).append(":target),\n");
+
+        while (!descendants.empty()) {
+            int descendant_id = descendants.back();
+
+            if (!get_heading_data(descendant_id)) die();
+
+            agenda_css.append("    :has(#").append(
+                *(get_heading_data(descendant_id)->identifier)
+            ).append(":target)");
+
+            descendants.pop_back();
+
+            if (descendants.empty()) {
+                agenda_css.append("\n");
+            }
+            else {
+                agenda_css.append(",\n");
+            }
+        }
+
+        agenda_css.append(") #MDMA-AGENDA a[href=\"#").append(
+            *(get_heading_data(heading_id)->identifier)
+        ).append("\"] + div");
+
+        heading_to_descendants.erase(heading_id);
+
+        if (heading_to_descendants.empty()) {
+            agenda_css.append(
+                " {\n"
+                "    max-height: 0;\n"
+                "    transition: max-height 0.2s ease-out;\n"
+                "}\n"
+            );
+        }
+        else {
+            agenda_css.append(",\n");
+        }
+    }
+
+    return agenda_css;
+}
+
+std::string MDMA::dump(const std::list<tinyxml2::XMLDocument> &docs) const {
+    tinyxml2::XMLPrinter printer(nullptr, true);
+
+    for (const tinyxml2::XMLDocument &section : sections) {
+        section.Print(&printer);
+    }
+
+    return std::string(printer.CStr());
+}
+
 
 void MDMA::add_heading(
     int id, int level, const char *title, std::map<int, int> &level_to_id
@@ -781,156 +1194,7 @@ TidyNode MDMA::find_if(
     return {};
 }
 
-void MDMA::install_content(tinyxml2::XMLDocument &doc) const {
-    tinyxml2::XMLElement *root = doc.RootElement();
-    tinyxml2::XMLElement *content = find_element(*root, "MDMA-CONTENT");
-
-    if (!content) return;
-
-    content->DeleteChildren();
-
-    for (const tinyxml2::XMLDocument &section : sections) {
-        const tinyxml2::XMLElement *root = section.RootElement();
-        tinyxml2::XMLNode *node = root->DeepClone(&doc);
-
-        if (node) {
-            content->InsertEndChild(node);
-        }
-    }
-}
-
-void MDMA::install_agenda(tinyxml2::XMLDocument &doc) const {
-    tinyxml2::XMLElement *root = doc.RootElement();
-    tinyxml2::XMLElement *agenda = find_element(*root, "MDMA-AGENDA");
-
-    if (!agenda) return;
-
-    agenda->DeleteChildren();
-
-    std::map<int, tinyxml2::XMLElement*> groups{{0, agenda}};
-
-    for (const auto &p : headings) {
-        int parent_id = *(std::get<0>(p.second).parent_id);
-        tinyxml2::XMLElement *container = std::prev(groups.end())->second;
-
-        if (groups.count(parent_id)) {
-            container = groups.at(parent_id);
-
-            while (!groups.empty()) {
-                int group_id = std::prev(groups.end())->first;
-
-                if (group_id != parent_id) {
-                    groups.erase(group_id);
-                    continue;
-                }
-
-                break;
-            }
-        }
-        else {
-            tinyxml2::XMLNode *node = container->InsertEndChild(
-                doc.NewElement("div")
-            );
-
-            tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
-
-            if (elem) {
-                groups.emplace(parent_id, elem);
-                container = elem;
-            }
-            else die();
-        }
-
-        tinyxml2::XMLNode *node = container->InsertEndChild(
-            doc.NewElement("a")
-        );
-
-        tinyxml2::XMLElement *elem = node ? node->ToElement() : nullptr;
-
-        if (elem) {
-            elem->SetAttribute("target", "_self");
-            elem->SetAttribute(
-                "href",
-                std::string("#").append(
-                    std::get<0>(p.second).identifier->c_str()
-                ).c_str()
-            );
-
-            elem->InsertNewText(std::get<0>(p.second).title->c_str());
-        }
-        else die();
-    }
-}
-
-void MDMA::install_loader(tinyxml2::XMLDocument &doc) const {
-    tinyxml2::XMLElement *root = doc.RootElement();
-
-    std::vector<tinyxml2::XMLElement *> checkpoints;
-
-    find_if(
-        *root,
-        [&checkpoints](const tinyxml2::XMLNode &node, int node_depth) {
-            const tinyxml2::XMLElement *el = node.ToElement();
-            const char *name = el ? el->Name() : nullptr;
-
-            if (!name) return false;
-
-            bool checkpoint{
-                !strcasecmp("h1",   name) ||
-                !strcasecmp("h2",   name) ||
-                !strcasecmp("h3",   name) ||
-                !strcasecmp("h4",   name) ||
-                !strcasecmp("h5",   name) ||
-                !strcasecmp("h6",   name)
-            };
-
-            if (checkpoint) {
-                checkpoints.emplace_back(
-                    const_cast<tinyxml2::XMLElement *>(el)
-                );
-            }
-
-            return false;
-        }
-    );
-
-    for (size_t i=0; i<checkpoints.size(); ++i) {
-        tinyxml2::XMLElement *el = checkpoints[i];
-        tinyxml2::XMLNode *el_parent = el->Parent();
-
-        tinyxml2::XMLNode *style{
-            el_parent->InsertAfterChild(el, doc.NewElement("style"))
-        };
-
-        tinyxml2::XMLElement *style_el = style ? style->ToElement() : nullptr;
-
-        if (style_el) {
-            style_el->SetAttribute("class", "MDMA-AUTOGENERATED");
-            style_el->SetText(
-                std::string(":root {--MDMA-PAGE-LOADED: ").append(
-                    std::to_string((100*(i+1)) / checkpoints.size())
-                ).append("%;}").c_str()
-            );
-        }
-    }
-
-    tinyxml2::XMLNode *end_style{
-        root->InsertEndChild(doc.NewElement("style"))
-    };
-
-    tinyxml2::XMLElement *style_el{
-        end_style ? end_style->ToElement() : nullptr
-    };
-
-    if (style_el) {
-        style_el->SetAttribute("class", "MDMA-AUTOGENERATED");
-        style_el->SetText(
-            std::string(":root {--MDMA-LOADER-OPACITY: 0%;}").c_str()
-        );
-    }
-}
-
-void MDMA::enhance_tables(tinyxml2::XMLDocument &doc) const {
+void MDMA::patch_tables(tinyxml2::XMLDocument &doc) const {
     find_if(
         *doc.RootElement(),
         [](const tinyxml2::XMLNode &node, int) {
@@ -971,7 +1235,7 @@ void MDMA::enhance_tables(tinyxml2::XMLDocument &doc) const {
     );
 }
 
-void MDMA::enhance_videos(tinyxml2::XMLDocument &doc) const {
+void MDMA::embed_videos(tinyxml2::XMLDocument &doc) const {
     static constexpr const std::string_view video_prefix{
         "https://www.youtube.com/watch?"
     };
@@ -1126,7 +1390,7 @@ void MDMA::enhance_image(tinyxml2::XMLElement &el) {
             imlib_context_set_image(img_dst);
             imlib_image_set_format(src_fmt);
 
-            std::vector<unsigned char> rawdst{ dump_image(img_dst) };
+            std::vector<unsigned char> rawdst{ dump(img_dst) };
 
             imlib_context_set_image(img_dst);
             imlib_free_image();
@@ -1182,130 +1446,6 @@ void MDMA::enhance_images(tinyxml2::XMLDocument &doc) {
     for (tinyxml2::XMLElement *el : images) {
         enhance_image(*el);
     }
-}
-
-std::string MDMA::generate_framework_style() const {
-    std::string agenda_css{
-        ":root {--MDMA-LOADER-OPACITY: 100%; --MDMA-PAGE-LOADED: 0%;}\n"
-    };
-
-    size_t heading_counter = 0;
-    std::map<int, std::vector<int>> heading_to_descendants;
-
-    for (const auto &p : headings) {
-        int parent_id = *(std::get<0>(p.second).parent_id);
-
-        if (parent_id) {
-            heading_to_descendants[parent_id].emplace_back(p.first);
-        }
-
-        std::string *anchor_id = std::get<0>(p.second).identifier;
-
-        ++heading_counter;
-
-        agenda_css.append("body:has(#").append(*anchor_id).append(
-            ":target) #MDMA-AGENDA a[href=\"#"
-        ).append(*anchor_id).append("\"]");
-
-        if (heading_counter == headings.size()) {
-            agenda_css.append(" {\n").append(
-                "    color: var(--MDMA-AGENDA-TARGET-COLOR);\n}\n"
-            );
-        }
-        else {
-            agenda_css.append(",\n");
-        }
-    }
-
-    for (auto &p : heading_to_descendants) {
-        std::vector<int> &descendants = p.second;
-
-        for (size_t i=0; i<descendants.size(); ++i) {
-            int descendant_id = descendants[i];
-
-            if (heading_to_descendants.count(descendant_id)) {
-                for (int id : heading_to_descendants[descendant_id]) {
-                    descendants.emplace_back(id);
-                }
-            }
-        }
-    }
-
-    while (!heading_to_descendants.empty()) {
-        int heading_id = heading_to_descendants.begin()->first;
-        std::vector<int> &descendants = heading_to_descendants.at(heading_id);
-
-        if (!get_heading_data(heading_id)) die();
-
-        agenda_css.append("body:not(\n");
-        agenda_css.append("    :has(#").append(
-            *(get_heading_data(heading_id)->identifier)
-        ).append(":target),\n");
-
-        while (!descendants.empty()) {
-            int descendant_id = descendants.back();
-
-            if (!get_heading_data(descendant_id)) die();
-
-            agenda_css.append("    :has(#").append(
-                *(get_heading_data(descendant_id)->identifier)
-            ).append(":target)");
-
-            descendants.pop_back();
-
-            if (descendants.empty()) {
-                agenda_css.append("\n");
-            }
-            else {
-                agenda_css.append(",\n");
-            }
-        }
-
-        agenda_css.append(") #MDMA-AGENDA a[href=\"#").append(
-            *(get_heading_data(heading_id)->identifier)
-        ).append("\"] + div");
-
-        heading_to_descendants.erase(heading_id);
-
-        if (heading_to_descendants.empty()) {
-            agenda_css.append(
-                " {\n"
-                "    max-height: 0;\n"
-                "    transition: max-height 0.2s ease-out;\n"
-                "}\n"
-            );
-        }
-        else {
-            agenda_css.append(",\n");
-        }
-    }
-
-    return agenda_css;
-}
-
-std::string MDMA::assemble_framework_body(const char *body_html) {
-    tinyxml2::XMLDocument doc;
-
-    html2xml(
-        std::string(smallest_valid_html5).append(body_html), doc, TidyTag_BODY
-    );
-
-    install_content(doc);
-    install_agenda(doc);
-
-    enhance_tables(doc);
-    enhance_videos(doc);
-    enhance_images(doc);
-
-    install_loader(doc);
-
-    tinyxml2::XMLPrinter printer(nullptr, true);
-    doc.Print(&printer);
-
-    return xml2html(
-        std::string(smallest_valid_html5).append(printer.CStr()).c_str(),
-        TidyTag_BODY
-    );
 }
 
 void MDMA::set_logger(const std::function<void(const char *)>& log_cb) {
@@ -1431,59 +1571,6 @@ std::vector<unsigned char> MDMA::decode_base64(const char *str) {
     return decode_base64(str, strlen(str));
 }
 
-void MDMA::html2xml(
-    const std::string &html, tinyxml2::XMLDocument &doc, const TidyTagId tag_id
-) {
-    TidyDoc tdoc_xml = tidyCreate();
-
-    setup(tdoc_xml);
-    tidyOptSetBool(tdoc_xml, TidyXmlOut, yes);
-    tidyParseString(tdoc_xml, html.c_str());
-
-    TidyNode node = find_if(
-        tidyGetRoot(tdoc_xml),
-        [&tag_id](const TidyNode &n, int) {
-            return tidyNodeGetId(n) == tag_id;
-        }
-    );
-
-    if (node) {
-        tidyBufClear(&htmltidy_buffer);
-        tidyNodeGetText(tdoc_xml, node, &htmltidy_buffer);
-    }
-    else die();
-
-    doc.Parse((const char *) htmltidy_buffer.bp, htmltidy_buffer.size);
-
-    tidyRelease(tdoc_xml);
-}
-
-std::string MDMA::xml2html(const char *xml, const TidyTagId tag_id) {
-    TidyDoc tdoc = tidyCreate();
-
-    setup(tdoc);
-    tidyParseString(tdoc, xml);
-
-    TidyNode node = find_if(
-        tidyGetRoot(tdoc),
-        [&tag_id](const TidyNode &n, int) {
-            return tidyNodeGetId(n) == tag_id;
-        }
-    );
-
-    if (node) {
-        tidyBufClear(&htmltidy_buffer);
-        tidyNodeGetText(tdoc, node, &htmltidy_buffer);
-    }
-    else die();
-
-    tidyRelease(tdoc);
-
-    return std::string(
-        (const char *) htmltidy_buffer.bp, htmltidy_buffer.size
-    );
-}
-
 const MDMA::heading_data *MDMA::get_heading_data(int id) const {
     if (!headings.count(id)) return nullptr;
 
@@ -1537,7 +1624,11 @@ std::vector<unsigned char> MDMA::load_file(const char *src) {
     };
 
     if (cfg.verbose) {
-        log("Loading %.50s\u2026", src);
+        static constexpr const int max_src_len = 50;
+        log(
+            "Loading '%.*s%s", max_src_len, src,
+            strlen(src) > max_src_len ? "\u2026" : "'."
+        );
     }
 
     if (!strncasecmp(src, prefixes.data.data(), prefixes.data.size())) {
@@ -1582,7 +1673,7 @@ std::vector<unsigned char> MDMA::load_file(const char *src) {
     return std::vector<unsigned char>(&view.front(), &view.back());
 }
 
-std::vector<unsigned char> MDMA::dump_image(const Imlib_Image &image) const {
+std::vector<unsigned char> MDMA::dump(const Imlib_Image &image) const {
     imlib_context_set_image(image);
 
     const char *filename = imlib_image_get_filename();

@@ -18,7 +18,9 @@ class OPTIONS {
         "  -f  --framework     Use a custom HTML framework file.\n"
         "  -h  --help          Display this usage information.\n"
         "      --minify        Disable HTML indentation and wrapping.\n"
-        "  -o  --output        Specify output file (default: stdout).\n"
+        "      --monolith      Embed images and styles within the output.\n"
+        "  -o  --output        Specify the output file (standard output).\n"
+        "  -p  --preview       Set the image preview shrinking factor (%d).\n"
         "      --verbose       Print verbose messages.\n"
         "  -v  --version       Show version information.\n"
         "\n"
@@ -35,6 +37,7 @@ class OPTIONS {
         int verbose;
         int debug;
         int minify;
+        int monolith;
         int dialect;
         int exit;
     };
@@ -42,16 +45,18 @@ class OPTIONS {
     OPTIONS(const char *caption, const char *version, const char *copyright)
         : flags(
             {
-                .verbose = 0,
-                .debug   = 0,
-                .minify  = 0,
-                .dialect = DIALECT_GITHUB,
-                .exit    = 0
+                .verbose  = 0,
+                .debug    = 0,
+                .minify   = 0,
+                .monolith = 0,
+                .dialect  = DIALECT_GITHUB,
+                .exit     = 0
             }
         )
         , file         (        "" )
         , framework    (        "" )
         , output       (        "" )
+        , preview      (         8 )
         , caption      (   caption )
         , version      (   version )
         , copyright    ( copyright )
@@ -64,6 +69,7 @@ class OPTIONS {
     std::string  file;
     std::string  framework;
     std::string  output;
+    uint8_t      preview;
 
     std::string caption;
     std::string version;
@@ -79,12 +85,14 @@ class OPTIONS {
             { "brief",      no_argument, &flags.verbose,                  0 },
             { "verbose",    no_argument, &flags.verbose,                  1 },
             { "minify",     no_argument, &flags.minify,                   1 },
+            { "monolith",   no_argument, &flags.monolith,                 1 },
             { "commonmark", no_argument, &flags.dialect, DIALECT_COMMONMARK },
             { "github",     no_argument, &flags.dialect,     DIALECT_GITHUB },
 
             // These options don't set a flag. We distinguish them by indices:
             { "framework",   required_argument, 0, 'f'},
             { "output",      required_argument, 0, 'o'},
+            { "preview",     required_argument, 0, 'p'},
             { "help",        no_argument,       0, 'h'},
             { "version",     no_argument,       0, 'v'},
             { 0,             0,                 0,  0 }
@@ -97,7 +105,7 @@ class OPTIONS {
             int option_index = 0;
 
             int c = getopt_long(
-                argc, argv, "f:o:hv", long_options, &option_index
+                argc, argv, "f:o:p:hv", long_options, &option_index
             );
 
             // Detect the end of the options.
@@ -125,13 +133,27 @@ class OPTIONS {
                     break;
                 }
                 case 'h': {
-                    fprintf(stdout, usage_format, argv[0]);
+                    fprintf(stdout, usage_format, argv[0], int(preview));
                     flags.exit = 1;
 
                     break;
                 }
                 case 'o': {
                     output.assign(optarg);
+                    break;
+                }
+                case 'p': {
+                    int i = atoi(optarg);
+
+                    if ((i == 0 && (optarg[0] != '0' || optarg[1] != '\0'))
+                    ||  (i < 0 || i > std::numeric_limits<uint8_t>::max())) {
+                        log(
+                            "invalid %s: %s",
+                            long_options[option_index].name, optarg
+                        );
+                    }
+                    else preview = uint8_t(i);
+
                     break;
                 }
                 case 'v': {
