@@ -43,7 +43,9 @@ General options:
   -f  --framework     Use a custom HTML framework file.
   -h  --help          Display this usage information.
       --minify        Disable HTML indentation and wrapping.
-  -o  --output        Specify output file (default: stdout).
+      --monolith      Embed images and styles within the output.
+  -o  --output        Specify the output file (standard output).
+  -p  --preview       Set the image preview shrinking factor (8).
       --verbose       Print verbose messages.
   -v  --version       Show version information.
 
