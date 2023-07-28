@@ -22,6 +22,8 @@
 #include <b64/encode.h>
 #include <b64/decode.h>
 #include <fstream>
+#include <format>
+#include <chrono>
 
 class MDMA {
     public:
@@ -529,6 +531,11 @@ std::string MDMA::dump_inflated(const TidyDoc framework) {
             }
             else if (!strcmp("MDMA-AGENDA", attr_val)) {
                 dump_agenda(headings).swap(*value);
+            }
+            else if (!strcmp("MDMA-YEAR", attr_val)) {
+                std::format("{:%Y}", std::chrono::system_clock::now()).swap(
+                    *value
+                );
             }
 
             return;
