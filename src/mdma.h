@@ -24,6 +24,7 @@
 #include <fstream>
 #include <format>
 #include <chrono>
+#include <curl/curl.h>
 
 class MDMA {
     public:
@@ -43,11 +44,14 @@ class MDMA {
     , directory("")
     , assembly_buffer("")
     , htmltidy_buffer{}
+    , curl(nullptr)
     , log_callback(nullptr) {
         tidyBufInit(&htmltidy_buffer);
+        curl = curl_easy_init();
     }
 
     ~MDMA() {
+        curl_easy_cleanup(curl);
         tidyBufFree(&htmltidy_buffer);
     }
 
@@ -153,6 +157,7 @@ class MDMA {
     std::filesystem::path directory;
     std::string assembly_buffer;
     TidyBuffer  htmltidy_buffer;
+    CURL *curl;
     std::function<void(const char *text)> log_callback;
     std::map<std::string, int> identifiers;
     std::list<tinyxml2::XMLDocument> sections;
@@ -1484,6 +1489,7 @@ void MDMA::embed_videos(tinyxml2::XMLDocument &doc) const {
 
                 iframe_el->SetAttribute("loading", "lazy");
                 iframe_el->SetAttribute("allowfullscreen", "");
+                iframe_el->SetAttribute("style", "color-scheme: normal;");
             }
 
             doc.DeleteNode(link);
@@ -1695,8 +1701,56 @@ std::vector<unsigned char> MDMA::load_file(const char *src) {
 
     if (!strncasecmp(src, prefixes.http.data(),  prefixes.http.size())
     ||  !strncasecmp(src, prefixes.https.data(), prefixes.https.size())) {
+        size_t (*cb)(void *, size_t, size_t, void *){
+            [](void *contents, size_t size, size_t nmemb, void *userp) {
+                std::vector<unsigned char> *v{
+                    (std::vector<unsigned char> *) userp
+                };
+
+                v->insert(
+                    v->end(),
+                    (unsigned char *) contents,
+                    ((unsigned char *) contents) + (size * nmemb)
+                );
+
+                return size * nmemb;
+            }
+        };
+
         // Download the file from the Internet.
         std::vector<unsigned char> file;
+
+        if (curl) {
+            CURLcode res;
+            std::array<char, CURL_ERROR_SIZE> errbuf;
+
+            curl_easy_setopt(curl, CURLOPT_URL, src);
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
+            curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf.data());
+
+            if ((res = curl_easy_perform(curl)) != CURLE_OK) {
+                file.clear();
+
+                size_t len = strlen(errbuf.data());
+
+                if (len) {
+                    log(
+                        "%s%s", errbuf.data(),
+                        ((errbuf[len - 1] != '\n') ? "\n" : "")
+                    );
+                }
+                else {
+                    log("%s\n", curl_easy_strerror(res));
+                }
+            }
+            else if (cfg.verbose) {
+                log(
+                    "Downloaded %lu byte%s.", file.size(),
+                    file.size() == 1 ? "" : "s"
+                );
+            }
+        }
 
         return file;
     }
