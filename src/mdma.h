@@ -149,7 +149,6 @@ class MDMA {
 
     std::string encode_base64(const unsigned char *, size_t);
 
-    static std::string bin2safe(unsigned char *bytes, size_t len);
     static const char *imgfmt2mime(const char *fmt);
 
     const heading_data *get_heading_data(int id) const;
@@ -1191,9 +1190,6 @@ void MDMA::add_heading(
             }
 
             suffix.assign(std::to_string(i));
-            suffix.assign(
-                bin2safe((unsigned char*) suffix.data(), suffix.size())
-            );
 
             continue;
         }
@@ -1547,21 +1543,6 @@ void MDMA::die(const char *file, int line) const {
     bug(file, line);
     fflush(nullptr);
     raise(SIGSEGV);
-}
-
-std::string MDMA::bin2safe(unsigned char *bytes, size_t len) {
-    static const char *symbols =
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    static size_t symlen = std::strlen(symbols);
-    std::string result;
-
-    for (size_t i=0; i<len; ++i) {
-        unsigned char b = bytes[i];
-        size_t index = b % symlen;
-        result.append(1, symbols[index]);
-    }
-
-    return result;
 }
 
 const char *MDMA::imgfmt2mime(const char *fmt) {
