@@ -22,8 +22,17 @@
                 200vh - var(--content-padding) - 100vw
             ), 100vh
         );
-        --menu-width: 10rem;
+        --menu-width: 12rem;
         --menu-burger-width: 2rem;
+        --menu-burger-height: 1.5rem;
+        --menu-header-height: var(--menu-burger-height);
+        --menu-footer-height: var(--menu-header-height);
+        --menu-agenda-max-height: calc(
+            100vh - var(--menu-header-height) - var(--menu-footer-height)
+        );
+        --menu-transition-speed: 0.2s;
+        --md-page-max-width: 980px;
+        --border-radius: 1rem;
     }
 
     *, ::before, ::after {
@@ -36,6 +45,7 @@
         height:100%;
         width:100%;
         overflow: hidden;
+        white-space: nowrap;
     }
 
     .container {
@@ -44,7 +54,6 @@
         background-size: cover;
         background-position: center center;
         text-align: right;
-        white-space: nowrap;
         display: grid;
         place-items: center end;
     }
@@ -55,7 +64,7 @@
         left: 0;
         width: var(--MDMA-PAGE-LOADED);
         height: max(0.5vh, 2px);
-        background-color: rgba(0,255,0,0.5);
+        background-color: rgba(20,109,148,0.5);
         opacity: var(--MDMA-LOADER-OPACITY);
         pointer-events: none;
         transition: opacity 0.5s ease, width 0.25s ease;
@@ -65,8 +74,8 @@
     .content {
         position: relative;
         display: inline-block;
-        overflow: hidden;
-        width: var(--content-width);
+        overflow: visible;
+        width: 100%;
         height: var(--content-height);
         vertical-align: middle;
     }
@@ -91,28 +100,58 @@
         display: inline-block;
         top: 0;
         left: 0;
+        width: 100vw;
+        height: 100vh;
+    }
+
+    .md-page {
+        position: absolute;
+        top: 0;
+        left: calc(100% - var(--content-width));
         width: var(--content-width);
-        height: var(--content-height);
+        height: 100%;
+        max-width: var(--md-page-max-width);
+        border-radius: var(--border-radius);
+        pointer-events: none;
+        box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+        overflow: hidden;
+        background-color: silver;
+    }
+
+    .md-page > div:first-child {
+        position: absolute;
+        top: var(--border-radius);
+        left: 0;
+        right: 0;
+        bottom: var(--border-radius);
+        box-shadow: rgba(99, 99, 99, 0.1) 0px 0px 1px 1px;
+    }
+
+    .md-page > div:nth-child(2) {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: var(--border-radius);
+        line-height: var(--border-radius);
+        text-align: center;
+        font-size: x-small;
+        color: rgba(99, 99, 99, 0.5);
     }
 
     #MDMA-CONTENT {
         position: absolute;
-        top: 0;
+        top: var(--border-radius);
         left: 0;
         right: 0;
-        bottom: 0;
+        bottom: var(--border-radius);
         width: 100%;
-        height: 100%;
         text-align: left;
-        scroll-behavior: smooth;
         overflow-y: scroll;
         overflow-x: hidden;
         z-index: 0;
-        background: rgba(255, 255, 255, 0.5);
-        border-top-left-radius: 1rem;
-        border-bottom-left-radius: 1rem;
-        border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
-        border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
+        background-color: transparent;
+        padding-left: calc(100% - var(--content-width));
     }
 
     #burger {
@@ -135,35 +174,77 @@
         z-index: 1;
         pointer-events: none;
         overflow: visible;
-        transition: width 0.1s linear;
+        transition: width var(--menu-transition-speed) linear;
     }
 
     .options {
         position: absolute;
-        top: 0.125rem;
+        top: 0;
         right: 0;
         width: 100%;
         text-align: left;
         pointer-events: auto;
-        overflow-y: auto;
-        overflow-x: hidden;
-        max-height: calc(100% - 0.25rem);
-        background: rgba(255, 255, 255, 0.4);
+        overflow: hidden;
+        max-height: 100%;
+        background-color: transparent;
+        box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
         backdrop-filter: blur(8px);
-        border-top-left-radius: 1rem;
-        border-bottom-left-radius: 1rem;
-        border-top: 0.125rem outset rgba(255, 255, 255, 0.5);
-        border-bottom: 0.125rem outset rgba(255, 255, 255, 0.5);
+        border-top-left-radius: var(--border-radius);
+        border-bottom-left-radius: var(--border-radius);
+    }
+
+    .options-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: white;
+        z-index: -1;
+        opacity: 0.25;
+    }
+
+    .menu-header, .menu-footer {
+        height: var(--menu-header-height);
+        line-height: var(--menu-header-height);
+    }
+
+    .menu-footer {
+        height: var(--menu-footer-height);
+        line-height: var(--menu-footer-height);
+        font-size: x-small;
+        text-align: center;
+        width: var(--menu-width);
+        color: rgba(99, 99, 99, 0.3);
+    }
+
+    .menu-footer a {
+        opacity: 0.3;
+    }
+
+    .menu-header, .menu-footer {
+        overflow: hidden;
+        box-shadow: rgba(99, 99, 99, 0.1) 0px 0.5px 1px 0px;
+    }
+
+    #MDMA-AGENDA {
         padding: 0.5rem;
         padding-right: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        max-height: var(--menu-agenda-max-height);
+        box-shadow: rgba(99, 99, 99, 0.1) 0px 0.5px 1px 0px;
     }
 
     #MDMA-AGENDA a {
-    display: block;
+        display: block;
+        text-overflow: ellipsis;
+        overflow: hidden;
     }
 
     #MDMA-AGENDA div > div {
         padding-left: 0.5rem;
+        transition: padding-left var(--menu-transition-speed) ease;
     }
 
     .MDMA-VIDEO-CONTAINER {
@@ -189,6 +270,7 @@
         padding: 1rem;
         padding-right: var(--menu-burger-width);
         white-space: normal;
+        max-width: var(--md-page-max-width);
     }
 
     .tab img {
@@ -205,7 +287,7 @@
         display: block;
     }
 
-    .menu > .options a + div {
+    #MDMA-AGENDA a + div {
         max-height: 100vh;
         transition: max-height 0.3s ease-in;
         overflow: hidden;
@@ -221,7 +303,7 @@
     label[for="burger"]::after {
         content: "✖";
         opacity: 0;
-        transition: opacity 0.1s linear;
+        transition: opacity var(--menu-transition-speed) linear;
     }
 
     @container (min-width: 1px) {
@@ -231,12 +313,16 @@
             cursor: pointer;
         }
 
-        :not(#burger:checked) + .menu > .options > label[for="burger"]::after {
+        :not(#burger:checked) + .menu label[for="burger"]::after {
             content: "☰";
         }
 
         :not(#burger:checked) + .menu{
             width: min(var(--menu-burger-width), var(--menu-width));
+        }
+
+        :not(#burger:checked) + .menu #MDMA-AGENDA div > div {
+            padding-left: 0rem;
         }
 
         .tab {
@@ -270,10 +356,19 @@
     <div id="MDMA-LOADER">
     </div>
 
-    <div class="container">
-      <div class="content">
-        <div id="width-guard">
-          <div>
+    <div id="width-guard">
+      <div>
+        <div class="container">
+          <div class="content">
+            <div class="md-page">
+              <div>
+              </div>
+
+              <div>
+                ©<span id="MDMA-YEAR">2023</span>
+              </div>
+            </div>
+
             <div id="MDMA-CONTENT">
               <article class="tab">
                 <h1>
@@ -465,6 +560,14 @@ Markdown dialect options:
                       manipulation
                     </p>
                   </li>
+
+                  <li>
+                    <p>
+                      <a href="https://curl.se/" target=
+                      "_blank">curl</a> — Command line tool and
+                      library for transferring data with URLs
+                    </p>
+                  </li>
                 </ul>
               </article>
 
@@ -519,29 +622,38 @@ Markdown dialect options:
                 </p>
               </article>
             </div>
-            <input id="burger" name="burger" type="checkbox" value=
-            "value">
-            <div class="menu">
-              <div class="options">
-                <label for="burger"></label>
-                <div id="MDMA-AGENDA">
-                  <div>
-                    <a href="#About" target=
-                    "_self">About</a><a href="#Usage" target=
-                    "_self">Usage</a>
-                    <div>
-                      <a href="#Synopsis" target=
-                      "_self">Synopsis</a><a href=
-                      "#Build-Instructions" target="_self">Build
-                      Instructions</a><a href="#Dependencies"
-                      target="_self">Dependencies</a>
-                    </div>
-                    <a href="#Showcase" target=
-                    "_self">Showcase</a><a href="#License" target=
-                    "_self">License</a>
-                  </div>
+          </div>
+        </div>
+        <input id="burger" name="burger" type="checkbox" value=
+        "value">
+        <div class="menu">
+          <div class="options">
+            <div class="options-bg">
+            </div>
+
+            <div class="menu-header">
+              <label for="burger"></label>
+            </div>
+
+            <div id="MDMA-AGENDA">
+              <div>
+                <a href="#About" target="_self">About</a><a href=
+                "#Usage" target="_self">Usage</a>
+                <div>
+                  <a href="#Synopsis" target=
+                  "_self">Synopsis</a><a href="#Build-Instructions"
+                  target="_self">Build Instructions</a><a href=
+                  "#Dependencies" target="_self">Dependencies</a>
                 </div>
+                <a href="#Showcase" target=
+                "_self">Showcase</a><a href="#License" target=
+                "_self">License</a>
               </div>
+            </div>
+
+            <div class="menu-footer">
+              Powered by <a href="https://github.com/1Hyena/mdma"
+              target="_blank">MDMA</a>
             </div>
           </div>
         </div>
