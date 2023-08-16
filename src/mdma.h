@@ -1387,6 +1387,7 @@ void MDMA::patch_tables(tinyxml2::XMLDocument &doc) const {
 }
 
 void MDMA::embed_videos(tinyxml2::XMLDocument &doc) const {
+    static constexpr const std::string_view anchor_prefix{"#"};
     static constexpr const std::string_view video_prefix{
         "https://www.youtube.com/watch?"
     };
@@ -1404,6 +1405,10 @@ void MDMA::embed_videos(tinyxml2::XMLDocument &doc) const {
             }
 
             const char *href = el->Attribute("href");
+
+            if (!href) {
+                return false;
+            }
 
             if (href
             && !strncasecmp(href, video_prefix.data(), video_prefix.size())) {
@@ -1433,7 +1438,12 @@ void MDMA::embed_videos(tinyxml2::XMLDocument &doc) const {
                 const_cast<tinyxml2::XMLElement *>(el)
             };
 
-            fix_el->SetAttribute("target", "_blank");
+            if (strncasecmp(href, anchor_prefix.data(), anchor_prefix.size())) {
+                fix_el->SetAttribute("target", "_blank");
+            }
+            else {
+                fix_el->SetAttribute("target", "_self");
+            }
 
             return false;
         }
