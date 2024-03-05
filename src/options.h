@@ -102,7 +102,7 @@ class OPTIONS {
 
         while (1) {
             // getopt_long stores the option index here.
-            int option_index = 0;
+            int option_index = -1;
 
             int c = getopt_long(
                 argc, argv, "f:o:p:hv", long_options, &option_index
@@ -110,6 +110,21 @@ class OPTIONS {
 
             // Detect the end of the options.
             if (c == -1) break;
+
+            if (c && option_index == -1) {
+                for (const auto &opt : long_options) {
+                    if (c != opt.val) {
+                        continue;
+                    }
+
+                    option_index = static_cast<int>(&opt - &long_options[0]);
+                    break;
+                }
+
+                if (option_index == -1) {
+                    return false;
+                }
+            }
 
             switch (c) {
                 case 0:

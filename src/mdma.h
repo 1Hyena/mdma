@@ -29,7 +29,7 @@
 class MDMA {
     public:
     static constexpr const char *CAPTION = "MarkDown Monolith Assembler";
-    static constexpr const char *VERSION = "1.0";
+    static constexpr const char *VERSION = "1.01";
     static constexpr const char *AUTHOR  = "Erich Erstu";
 
     MDMA() : cfg(
