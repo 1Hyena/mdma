@@ -87,6 +87,9 @@ and their respective header files must be present in the system.
 * [imlib2](https://docs.enlightenment.org/api/imlib2/html/) —
   Library that does image file loading, saving and manipulation
 
+* [webp](https://developers.google.com/speed/webp) —
+  Library that handles the WebP image format
+
 * [curl](https://curl.se/) —
   Command line tool and library for transferring data with URLs
 

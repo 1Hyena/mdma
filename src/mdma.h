@@ -25,11 +25,12 @@
 #include <format>
 #include <chrono>
 #include <curl/curl.h>
+#include <webp/decode.h>
 
 class MDMA {
     public:
     static constexpr const char *CAPTION = "MarkDown Monolith Assembler";
-    static constexpr const char *VERSION = "1.01";
+    static constexpr const char *VERSION = "1.02";
     static constexpr const char *AUTHOR  = "Erich Erstu";
 
     MDMA() : cfg(
@@ -1028,15 +1029,39 @@ inline void MDMA::modify_image_attributes(
         imlib_load_image_mem("memimg", rawsrc.data(), rawsrc.size())
     };
 
+    int src_w;
+    int src_h;
+
     if (!img_src) {
-        log("Error loading image: %.50s", src);
+        if (WebPGetInfo(rawsrc.data(), rawsrc.size(), &src_w, &src_h)) {
+            attributes["width" ] = std::to_string(src_w);
+            attributes["height"] = std::to_string(src_h);
+
+            if (cfg.preview == 1 || cfg.monolith) {
+                // do not shrink, just use data-uri
+                std::string base64{
+                    encode_base64(rawsrc.data(), rawsrc.size())
+                };
+
+                if (!base64.empty()) {
+                    attributes["src"].assign(
+                        std::string("data:image/webp;base64,").append(base64)
+                    );
+                }
+            }
+
+        }
+        else {
+            log("Error loading image: %.50s", src);
+        }
+
         return;
     }
 
     imlib_context_set_image(img_src);
 
-    int src_w = imlib_image_get_width();
-    int src_h = imlib_image_get_height();
+    src_w = imlib_image_get_width();
+    src_h = imlib_image_get_height();
     const char *src_fmt = imlib_image_format();
 
     attributes["width" ] = std::to_string(src_w);
