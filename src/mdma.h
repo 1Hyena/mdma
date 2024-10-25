@@ -1039,9 +1039,7 @@ inline void MDMA::modify_image_attributes(
 
             if (cfg.preview == 1 || cfg.monolith) {
                 // do not shrink, just use data-uri
-                std::string base64{
-                    encode_base64(rawsrc.data(), rawsrc.size())
-                };
+                std::string base64{encode_base64(rawsrc.data(), rawsrc.size())};
 
                 if (!base64.empty()) {
                     attributes["src"].assign(
@@ -1049,7 +1047,6 @@ inline void MDMA::modify_image_attributes(
                     );
                 }
             }
-
         }
         else {
             log("Error loading image: %.50s", src);
@@ -1594,22 +1591,33 @@ inline std::string MDMA::encode_base64(
 ) {
     if (std::numeric_limits<int>::max() < len) die();
 
-    std::vector<char> base64buf(2*len+4);
+    std::array<char, 256> buffer;
     base64::base64_encodestate b64e;
     base64::base64_init_encodestate(&b64e);
+    std::string encoded;
 
-    int written = base64::base64_encode_block(
-        (const char *) bytes, int(len), base64buf.data(), &b64e
-    );
+    for (; len > 0;) {
+        int inlen = static_cast<int>(std::min(size_t{64}, len));
 
-    if (written < 0) die();
+        int written = base64::base64_encode_block(
+            (const char *) bytes, inlen, buffer.data(), &b64e
+        );
 
-    std::string encoded(base64buf.data(), written);
+        if (written < 0) die();
+        if (written == 0) break;
 
-    written = base64::base64_encode_blockend(base64buf.data(), &b64e);
+        bytes += inlen;
+        len -= inlen;
+        encoded.append(buffer.data(), written);
+    }
 
-    if (written > 0) {
-        encoded.append(base64buf.data(), written);
+    int written = base64::base64_encode_blockend(buffer.data(), &b64e);
+
+    if (written < 0) {
+        die();
+    }
+    else if (written > 0) {
+        encoded.append(buffer.data(), written);
     }
 
     encoded.erase(
@@ -1622,7 +1630,9 @@ inline std::string MDMA::encode_base64(
     return encoded;
 }
 
-inline std::vector<unsigned char> MDMA::decode_base64(const char *str, size_t len) {
+inline std::vector<unsigned char> MDMA::decode_base64(
+    const char *str, size_t len
+) {
     if (len > std::numeric_limits<int>::max()) die();
 
     size_t decoded_maxlen = len / 4 * 3 + 2;
@@ -1788,13 +1798,13 @@ inline std::vector<unsigned char> MDMA::load_file(const char *src) {
         return {};
     }
 
-    std::stringstream sstr;
+    std::vector<unsigned char> buffer(
+        std::istreambuf_iterator<char>(input), {}
+    );
 
-    input >> sstr.rdbuf();
+    input.close();
 
-    const std::string_view view{sstr.view()};
-
-    return std::vector<unsigned char>(&view.front(), &view.back());
+    return buffer;
 }
 
 inline std::vector<unsigned char> MDMA::dump(const Imlib_Image &image) const {
