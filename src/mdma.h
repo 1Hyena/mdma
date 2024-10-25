@@ -169,7 +169,7 @@ class MDMA {
     > headings;
 };
 
-const std::string *MDMA::assemble(
+inline const std::string *MDMA::assemble(
     const char *html, size_t html_len, const char *md, size_t md_len
 ) {
     const std::string *result = nullptr;
@@ -202,7 +202,7 @@ const std::string *MDMA::assemble(
     return result;
 }
 
-bool MDMA::deflate_framework(TidyDoc framework) {
+inline bool MDMA::deflate_framework(TidyDoc framework) {
     do {
         TidyNode found = find_if(
             tidyGetBody(framework),
@@ -305,7 +305,7 @@ bool MDMA::deflate_framework(TidyDoc framework) {
     return true;
 }
 
-bool MDMA::parse_markdown(const char *md, size_t md_len) {
+inline bool MDMA::parse_markdown(const char *md, size_t md_len) {
     std::string xhtml;
 
     bool fail = md_html(
@@ -487,7 +487,7 @@ bool MDMA::parse_markdown(const char *md, size_t md_len) {
     return true;
 }
 
-bool MDMA::inflate_framework(const TidyDoc framework) {
+inline bool MDMA::inflate_framework(const TidyDoc framework) {
     dump_inflated(framework).swap(assembly_buffer);
     dump_enhanced(assembly_buffer).swap(assembly_buffer);
     dump_repaired(assembly_buffer).swap(assembly_buffer);
@@ -495,7 +495,7 @@ bool MDMA::inflate_framework(const TidyDoc framework) {
     return true;
 }
 
-std::string MDMA::dump_inflated(const TidyDoc framework) {
+inline std::string MDMA::dump_inflated(const TidyDoc framework) {
     return dump(
         framework, tidyGetRoot(framework),
         [&](
@@ -547,7 +547,7 @@ std::string MDMA::dump_inflated(const TidyDoc framework) {
     );
 }
 
-std::string MDMA::dump_enhanced(const std::string &html) {
+inline std::string MDMA::dump_enhanced(const std::string &html) {
     size_t heading_counter = 0;
     TidyDoc doc = tidyCreate();
 
@@ -613,7 +613,7 @@ std::string MDMA::dump_enhanced(const std::string &html) {
     return enhanced;
 }
 
-std::string MDMA::dump_repaired(const std::string &html) {
+inline std::string MDMA::dump_repaired(const std::string &html) {
     TidyDoc doc = tidyCreate();
 
     setup(doc);
@@ -642,7 +642,7 @@ std::string MDMA::dump_repaired(const std::string &html) {
     return std::string((const char *) htmltidy_buffer.bp, htmltidy_buffer.size);
 }
 
-std::string MDMA::dump(
+inline std::string MDMA::dump(
     const TidyDoc doc, const TidyNode parent,
     std::function<
         void(
@@ -803,7 +803,7 @@ std::string MDMA::dump(
     return result;
 }
 
-std::string MDMA::dump(
+inline std::string MDMA::dump(
     const std::map<std::string, std::string> &attributes
 ) const {
     tinyxml2::XMLPrinter printer(nullptr, true);
@@ -822,7 +822,7 @@ std::string MDMA::dump(
     return std::string(printer.CStr()).append(flags);
 }
 
-std::string MDMA::dump_agenda(
+inline std::string MDMA::dump_agenda(
     const std::map<
         int, std::tuple<heading_data, int, std::string, std::string>
     > &headings
@@ -891,7 +891,7 @@ std::string MDMA::dump_agenda(
     return std::string(printer.CStr());
 }
 
-std::string MDMA::dump_style(
+inline std::string MDMA::dump_style(
     const std::map<
         int, std::tuple<heading_data, int, std::string, std::string>
     > &headings
@@ -994,7 +994,9 @@ std::string MDMA::dump_style(
     return agenda_css;
 }
 
-std::string MDMA::dump(const std::list<tinyxml2::XMLDocument> &docs) const {
+inline std::string MDMA::dump(
+    const std::list<tinyxml2::XMLDocument> &docs
+) const {
     tinyxml2::XMLPrinter printer(nullptr, true);
 
     for (const tinyxml2::XMLDocument &section : sections) {
@@ -1004,7 +1006,7 @@ std::string MDMA::dump(const std::list<tinyxml2::XMLDocument> &docs) const {
     return std::string(printer.CStr());
 }
 
-void MDMA::modify_image_attributes(
+inline void MDMA::modify_image_attributes(
     std::map<std::string, std::string> &attributes
 ) {
     if (!attributes.count("loading")) {
@@ -1098,7 +1100,7 @@ void MDMA::modify_image_attributes(
     imlib_free_image();
 }
 
-void MDMA::modify_link_attributes(
+inline void MDMA::modify_link_attributes(
     std::map<std::string, std::string> &attributes
 ) {
     if (!cfg.monolith
@@ -1156,7 +1158,7 @@ void MDMA::modify_link_attributes(
     }
 }
 
-void MDMA::add_heading(
+inline void MDMA::add_heading(
     int id, int level, const char *title, std::map<int, int> &level_to_id
 ) {
     int parent_id = 0;
@@ -1215,7 +1217,7 @@ void MDMA::add_heading(
     die();
 }
 
-void MDMA::setup(TidyDoc doc) const {
+inline void MDMA::setup(TidyDoc doc) const {
     tidyOptSetBool(doc, TidyMuteShow, yes);
     tidyOptSetValue(
         doc, TidyMuteReports,
@@ -1236,7 +1238,7 @@ void MDMA::setup(TidyDoc doc) const {
     tidyOptSetInt(doc, TidyWrapLen, 0);
 }
 
-tinyxml2::XMLNode *MDMA::find_if(
+inline tinyxml2::XMLNode *MDMA::find_if(
     const tinyxml2::XMLNode &root,
     std::function<bool(const tinyxml2::XMLNode &, int)> fun
 ) const {
@@ -1281,7 +1283,7 @@ tinyxml2::XMLNode *MDMA::find_if(
     return nullptr;
 }
 
-tinyxml2::XMLElement *MDMA::find_element(
+inline tinyxml2::XMLElement *MDMA::find_element(
     const tinyxml2::XMLNode &root, const char *id
 ) const {
     tinyxml2::XMLNode *found = find_if(
@@ -1301,7 +1303,7 @@ tinyxml2::XMLElement *MDMA::find_element(
     return found ? found->ToElement() : nullptr;
 }
 
-TidyNode MDMA::find_if(
+inline TidyNode MDMA::find_if(
     const TidyNode root, std::function<bool(const TidyNode &, int)> fun
 ) const {
     int depth = 0;
@@ -1345,7 +1347,7 @@ TidyNode MDMA::find_if(
     return {};
 }
 
-void MDMA::patch_tables(tinyxml2::XMLDocument &doc) const {
+inline void MDMA::patch_tables(tinyxml2::XMLDocument &doc) const {
     find_if(
         *doc.RootElement(),
         [](const tinyxml2::XMLNode &node, int) {
@@ -1386,7 +1388,7 @@ void MDMA::patch_tables(tinyxml2::XMLDocument &doc) const {
     );
 }
 
-void MDMA::embed_videos(tinyxml2::XMLDocument &doc) const {
+inline void MDMA::embed_videos(tinyxml2::XMLDocument &doc) const {
     static constexpr const std::string_view anchor_prefix{"#"};
     static constexpr const std::string_view video_prefix{
         "https://www.youtube.com/watch?"
@@ -1505,15 +1507,15 @@ void MDMA::embed_videos(tinyxml2::XMLDocument &doc) const {
     }
 }
 
-void MDMA::set_logger(const std::function<void(const char *)>& log_cb) {
+inline void MDMA::set_logger(const std::function<void(const char *)>& log_cb) {
     log_callback = log_cb;
 }
 
-void MDMA::set_directory(const std::filesystem::path &path) {
+inline void MDMA::set_directory(const std::filesystem::path &path) {
     directory = path;
 }
 
-void MDMA::log(const char *fmt, ...) const {
+inline void MDMA::log(const char *fmt, ...) const {
     if (!log_callback) return;
 
     char stackbuf[256];
@@ -1545,24 +1547,24 @@ void MDMA::log(const char *fmt, ...) const {
     if (bufptr && bufptr != stackbuf) delete [] bufptr;
 }
 
-void MDMA::bug(const char *file, int line) const {
+inline void MDMA::bug(const char *file, int line) const {
     log("Forbidden condition met in %s on line %d.", file, line);
 }
 
-void MDMA::die(const char *file, int line) const {
+inline void MDMA::die(const char *file, int line) const {
     bug(file, line);
     fflush(nullptr);
     raise(SIGSEGV);
 }
 
-const char *MDMA::imgfmt2mime(const char *fmt) {
+inline const char *MDMA::imgfmt2mime(const char *fmt) {
     return (
         !strcasecmp("jpg", fmt) ? "jpeg"    :
         !strcasecmp("svg", fmt) ? "svg+xml" : fmt
     );
 }
 
-std::string MDMA::encode_base64(
+inline std::string MDMA::encode_base64(
     const unsigned char *bytes, size_t len
 ) {
     if (std::numeric_limits<int>::max() < len) die();
@@ -1595,7 +1597,7 @@ std::string MDMA::encode_base64(
     return encoded;
 }
 
-std::vector<unsigned char> MDMA::decode_base64(const char *str, size_t len) {
+inline std::vector<unsigned char> MDMA::decode_base64(const char *str, size_t len) {
     if (len > std::numeric_limits<int>::max()) die();
 
     size_t decoded_maxlen = len / 4 * 3 + 2;
@@ -1616,17 +1618,17 @@ std::vector<unsigned char> MDMA::decode_base64(const char *str, size_t len) {
     return decoded;
 }
 
-std::vector<unsigned char> MDMA::decode_base64(const char *str) {
+inline std::vector<unsigned char> MDMA::decode_base64(const char *str) {
     return decode_base64(str, strlen(str));
 }
 
-const MDMA::heading_data *MDMA::get_heading_data(int id) const {
+inline const MDMA::heading_data *MDMA::get_heading_data(int id) const {
     if (!headings.count(id)) return nullptr;
 
     return &(std::get<0>(headings.at(id)));
 }
 
-std::string MDMA::uri_param_value(const char *uri_str, const char *key) {
+inline std::string MDMA::uri_param_value(const char *uri_str, const char *key) {
     std::string result;
     UriUriA uri;
     const char *errorPos;
@@ -1661,7 +1663,7 @@ std::string MDMA::uri_param_value(const char *uri_str, const char *key) {
     return result;
 }
 
-std::vector<unsigned char> MDMA::load_file(const char *src) {
+inline std::vector<unsigned char> MDMA::load_file(const char *src) {
     static constexpr struct prefix_type{
         const std::string_view data;
         const std::string_view http;
@@ -1770,7 +1772,7 @@ std::vector<unsigned char> MDMA::load_file(const char *src) {
     return std::vector<unsigned char>(&view.front(), &view.back());
 }
 
-std::vector<unsigned char> MDMA::dump(const Imlib_Image &image) const {
+inline std::vector<unsigned char> MDMA::dump(const Imlib_Image &image) const {
     imlib_context_set_image(image);
 
     const char *filename = imlib_image_get_filename();
