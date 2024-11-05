@@ -1199,15 +1199,12 @@ inline void MDMA::add_heading(
 
     level_to_id[level] = id;
 
-
     std::string slug{slugify(title)};
     std::string suffix;
 
     if (slug.empty()) {
         slug.assign("anchor");
     }
-
-    std::erase(slug, '\''); // TODO: Find out if/why slugify does not do it.
 
     for (size_t i=1; i<10000; ++i) {
         if (!identifiers.emplace(std::string(slug).append(suffix), id).second) {
