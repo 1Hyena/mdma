@@ -982,8 +982,8 @@ inline std::string MDMA::dump_style(
         if (heading_to_descendants.empty()) {
             agenda_css.append(
                 " {\n"
-                "    max-height: 0;\n"
-                "    transition: max-height 0.2s ease-out;\n"
+                "    font-size: 0;\n"
+                "    transition: font-size 0.2s ease-out;\n"
                 "}\n"
             );
         }
